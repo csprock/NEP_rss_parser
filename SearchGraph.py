@@ -45,6 +45,9 @@ class Vertex:
         self.matches = 0
         self.distance_from_root = int()
         self.is_root = is_root
+        
+        # for pruning function, subtract this list from neighbors (experimental)
+        self.to_delete = list()
     
     def add_neighbor(self, v):
         if v not in self.neighbors:
@@ -105,7 +108,9 @@ class SearchGraph:
         for e in disamb_data.get_relations():
             _add_edges(e[0],e[1])
         
-        
+        #### sort neighbors by name length ####
+#        for v in self.V:
+#            self.V[v].neighbors = self.V[v].neighbors.sort(key = len)
 
     ################################
     #### printing functions ########
@@ -154,6 +159,13 @@ class SearchGraph:
         nbhd = list(map(lambda n: n.name, nbhd))
         return nbhd
     
+#    def out_length_neighbors(self, v):
+#        d = len(v)
+#        
+#        nbhd = [self.V[u].name for u in self.V[v].neighbors]
+#        nbhd = list(filter(lambda n: len(n) > d, nbhd))
+#        
+#        return set(nbhd)
     
     ################### search functions ######################################
     
@@ -232,75 +244,83 @@ class SearchGraph:
                 
         return actual_matches
         
-        
     
-#    def find_matches(self):
-#                
-#        if self.count_stage == False:
-#            raise ValueError("Must run count_matches() stage first!")
-#        else:
-#            for v in self.V:
-#                self.V[v].visited = False
-#        
-#        def _active_outdegree(v):
-#            d = self.V[v].distance_from_root
-#            
-#            nbhd = [self.V[u] for u in self.V[v].neighbors]
-#            nbhd = list(filter(lambda n: n.distance_from_root > d, nbhd))
-#            temp = list(filter(lambda x: x.matches > 0, nbhd))
-#            
-#            return len(temp)
-#
-#        
-#        def _outneighbor_matches(v):
-#            d = self.V[v].distance_from_root
-#            nbhd = [self.V[u] for u in self.V[v].neighbors]
-#            nbhd = list(filter(lambda n: n.distance_from_root > d, nbhd))
-#            temp = list(filter(lambda x: x.matches > 0, nbhd))
-#            
-#            sums = []
-#            for n in temp:
-#                sums.append(n.matches)
-#            
-#            return sum(sums)
-#            
-#            
-#            
-#        
-#        root_node = self.V[self.root_name]
-#        # check that root node has distance 0
-#        if root_node.distance_from_root > 0 or root_node.is_root == False:
-#            raise ValueError
-#            
-#        queue = list()
-#        name_list = list()
-#        root_node.visited = True
-#        
-#        # check root node outdegree
-#        if _outneighbor_matches(root_node.name) < root_node.matches:
-#            name_list.append(root_node.name)
-#            
-#        
-#        for v in root_node.neighbors:
-#            queue.append(v)
-#            if _outneighbor_matches(v) < self.V[v].matches:
-#                name_list.append(v)
-#            
-#        while len(queue) > 0:
-#            u = queue.pop(0)
-#            node_u = self.V[u]
-#            node_u.visited = True
-#            
-#            for v in node_u.neighbors:
-#                node_v = self.V[v]
-#                
-#                if node_v.visited == False:
-#                    queue.append(v)
-#                    node_v.visited = True
-#                    if _outneighbor_matches(v) < node_v.matches:
-#                        name_list.append(v)
-#        
-#        return name_list
+    ###########################################################################################
+    
+    def prune_tree(self):
+                
+        ####################### functions #####################################
+        
+        def _out_length_neighbors(v):
+            d = len(v)
+            
+            nbhd = [self.V[u].name for u in self.V[v].neighbors]
+            nbhd = list(filter(lambda n: len(n) > d, nbhd))
+            
+            return set(nbhd)
+
+        
+        def neighbors_to_prune(v):
+            
+            out_nbhd = _out_length_neighbors(v)
+            
+            neighbors_to_prune = set()
+            
+            for u in out_nbhd:
+                nbhd_tmp = _out_length_neighbors(u)
+                neighbors_to_prune.update(out_nbhd.intersection(nbhd_tmp))
+                
+            return neighbors_to_prune
+        
+        #######################################################################
+
+        
+        ### initialize search ###
+        # reset SearchGraph variables from any previous runs
+        for v in self.V:
+            self.V[v].visited = False
+            
+        # initialize queue and root node
+        root_node = self.V[self.root_name]
+        root_node.distance_from_root = 0
+        root_node.visited = True
+        root_node.to_delete = list(neighbors_to_prune(self.root_name))
+        queue = list()
+        
+        # initialize BFS with root's neighbors
+        for v in root_node.neighbors:
+            queue.append(v)
+            #self.V[v].distance_from_root = 1
+            self.V[v].to_delete = list(neighbors_to_prune(v))
+               
+        ### continue BFS ###
+        while len(queue) > 0:
+            u = queue.pop(0)
+           # print(u)
+            node_u = self.V[u]
+            node_u.visited = True
+            node_u.to_delete = list(neighbors_to_prune(u))
+            
+            for v in node_u.neighbors:
+                node_v = self.V[v]
+                
+                if node_v.visited == False:
+                    queue.append(v)
+                    node_v.visited = True
+                    node_v.to_delete = list(neighbors_to_prune(v))
+
+
+        for v in self.V:
+            nbhd = set(self.V[v].neighbors)
+            self.V[v].neighbors = list(nbhd.difference(self.V[v].to_delete))
+            
+            # remove reciprocated edges
+            for u in self.V[v].to_delete:
+                temp_nbhd = self.V[u].neighbors
+                temp_nbhd.remove(v)
+                self.V[u].neighbors = temp_nbhd
+
+
 
 
     # uses BFS to run through search graph and count number of matches in a given string

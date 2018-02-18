@@ -22,7 +22,12 @@ class placeFilter:
         
         for i, p in enumerate(filter_list):
             if isinstance(p, disambiguation_data) == True:
-                filter_list[i] = SearchGraph((p))
+                G = SearchGraph(p)
+                G.prune_tree()
+                filter_list[i] = G
+                #filter_list[i].prune_tree()
+                # need to run pruning operation
+                
             elif isinstance(p, str) == True:
                 filter_list[i] = p     
             else:

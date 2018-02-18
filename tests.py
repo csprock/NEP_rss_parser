@@ -28,6 +28,9 @@ string = '''
         '''
 
 
+
+
+
 # STAGE 1: count total matches in string
 G.count_matches(string)
 G.print_matches()
@@ -43,6 +46,7 @@ data_struct1 = {'root':'Crown Heights',
                'children' : ['Crown Heights Plaza'],
                'relations': [('Crown Heights', 'Crown Heights Plaza')]}
         
+
 
 singleton = 'New Haven'
 

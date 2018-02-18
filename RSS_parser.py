@@ -4,6 +4,33 @@ import datetime
 import psycopg2
 from placeFilter import *
 from rss_config import connectToDatabase
+from createFilterList import createFilterList
+
+
+def getPlaceList(region_id, conn_obj):
+    
+    with conn_obj as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT place FROM place WHERE county_fips IN (SELECT county_fips FROM regions_to_county WHERE region_id = %s);", (region_id,))
+            place = cur.fetchall()
+    
+    with conn_obj as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT county FROM county WHERE county_fips IN (SELECT county_fips FROM regions_to_county WHERE region_id = %s)", (region_id,))
+            county = cur.fetchall()
+            
+            
+    cur = conn.cursor()
+    
+    place.extend(county)
+    return [p[0] for p in place]
+
+
+def makeFilter(region_id, conn_obj):
+    place_list = getPlaceList(region_id, conn_obj)
+    filter_list = createFilterList(place_list)
+    return placeFilter(filter_list)
+
 
 
 class processRSS:
@@ -18,6 +45,7 @@ class processRSS:
     def parse_feed(self, rss_url):
                 
         results = feedparser.parse(rss_url)
+        
         
         parsed_entries = []
         for entry in results.entries:
