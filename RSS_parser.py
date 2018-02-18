@@ -53,6 +53,10 @@ class processRSS:
             if parsed != None:
                 parsed_entries.append(parsed)
         
+        ### print error warnings ###
+        if results['bozo'] == 1:
+            print("WARN: " + results['bozo_exception'])
+        
         return parsed_entries    
 
     def _entry_parser(self, rss_entry):

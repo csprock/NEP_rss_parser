@@ -26,7 +26,7 @@ def updateSource(r, conn_obj):
         query_results = processor.parse_feed(url)
         writer = writeToArticleDB(CONN_INFO, feed_id)
         
-        print("%s results found for feed %s" % (len(query_results), feed_id))
+        print("%s results returned for Feed %s" % (len(query_results), feed_id))
         
         for i, r in enumerate(query_results):
             writer.writeToDatabase(r)
