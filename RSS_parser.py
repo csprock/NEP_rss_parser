@@ -55,7 +55,7 @@ class processRSS:
         
         ### print error warnings ###
         if results['bozo'] == 1:
-            print("WARN: " + results['bozo_exception'])
+            print("WARN: " + str(results['bozo_exception']))
         
         return parsed_entries    
 

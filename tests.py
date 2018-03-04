@@ -64,8 +64,6 @@ name_filter = placeFilter(places)
 name_filter.checkFilters(string)
 
 
-        
-        
 
 
 
