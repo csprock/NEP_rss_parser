@@ -21,6 +21,7 @@ data = disambiguation_data(data_struct)
 # initialize search graph
 G = SearchGraph(data)
 
+
 string = '''
         Welcome to West Portland Heights! A suburb of South Portland, 
         which is next to South Portland Heights but not to be confused with

@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Apr 11 18:05:07 2018
+
+@author: csprock
+"""
+
 import re
 # class for storing data structure that defines the disambiguation search graph
 class disambiguation_data:
