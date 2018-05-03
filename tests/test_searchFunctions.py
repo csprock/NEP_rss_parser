@@ -1,17 +1,24 @@
 
+
+import os, sys
 import unittest
 
-from entityFilter.SearchGraph import SearchGraph
-from entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
-from entityFilter.makeGraphData import makeGraphData
+if __name__ == '__main__':
+    
+    mypath = os.path.dirname(os.path.realpath('__file__'))
+    sys.path.append(os.path.join(mypath, os.pardir))
+    
+    from entityFilter.SearchGraph import SearchGraph
+    from entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
+    from entityFilter.makeGraphData import makeGraphData
 
 
-with open('test_places.txt','r') as r:
-    test_places = r.read().split('\n')
-    
-    
-with open('test_string.txt','r') as f:
-    test_string = f.read()
+    with open('test_places.txt','r') as r:
+        test_places = r.read().split('\n')
+        
+        
+    with open('test_string.txt','r') as f:
+        test_string = f.read()
     
 
 class TestSearchFunctions(unittest.TestCase):

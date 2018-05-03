@@ -1,6 +1,10 @@
-
-
 import unittest
+import os, sys
+
+if __name__ == '__main__':
+    mypath = os.path.dirname(os.path.realpath('__file__'))
+    sys.path.append(os.path.join(mypath, os.pardir))
+
 
 from entityFilter.makeGraphData import makeGraphData
 from entityFilter.SearchGraph import SearchGraph
