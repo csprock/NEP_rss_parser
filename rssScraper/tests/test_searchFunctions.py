@@ -7,24 +7,29 @@ if __name__ == '__main__':
     mypath = os.path.dirname(os.path.realpath('__file__'))
     sys.path.append(os.path.join(mypath, os.pardir))
     
-    from entityFilter.SearchGraph import SearchGraph
-    from entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
-    from entityFilter.makeGraphData import makeGraphData
+from entityFilter.SearchGraph import SearchGraph
+from entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
+from entityFilter.makeGraphData import makeGraphData
 
 
-    with open('test_places.txt','r') as r:
-        test_places = r.read().split('\n')
+#with open('test_places.txt','r') as r:
+#    test_places = r.read().split('\n')
+    
+    
+
+test_names_ids = list()
+with open('place_names_and_ids.csv', 'r') as testfile:
+    reader = csv.reader(testfile, delimiter = ',')
+    for r in reader:
+        test_names_ids.append((r[0], int(r[1])))
         
+test_places = [n[0] for n in test_names_ids]
         
-
-    test_names_ids = list()
-    with open('place_names_and_ids.csv', 'r') as testfile:
-        reader = csv.reader(testfile, delimiter = ',')
-        for r in reader:
-            test_names_ids.append((r[0], int(r[1])))
-            
-    with open('test_string.txt','r') as f:
-        test_string = f.read()
+with open('test_string.txt','r') as f:
+    test_string = f.read()
+    
+with open('empty_string.txt','r') as f:
+    empty_string = f.read()
     
 
 class TestSearchFunctions(unittest.TestCase):
@@ -35,17 +40,17 @@ class TestSearchFunctions(unittest.TestCase):
         self.G = SearchGraph(R, test_names_ids, E)
         self.G.prune()
         
-        self.expected = {'Portland':(5,2), 
-                    'South Portland':(2,0),
-                    'Portland Heights':(2,0),
-                    'South Portland Heights':(2,1),
-                    'South Portland Heights Plaza':(1,1),
-                    'Oakland':(1,1),
-                    'San Jose':(5,3),
-                    'South San Jose':(1,0),
-                    'South San Jose Terrace':(1,1),
-                    'Crown Heights':(1,1),
-                    'Crown Heights Plaza':(0,0)}
+        self.expected = {'Portland':(5,2,0), 
+                    'South Portland':(2,0,0),
+                    'Portland Heights':(2,0,0),
+                    'South Portland Heights':(2,1,0),
+                    'South Portland Heights Plaza':(1,1,0),
+                    'Oakland':(1,1,0),
+                    'San Jose':(5,3,0),
+                    'South San Jose':(1,0,0),
+                    'South San Jose Terrace':(1,1,0),
+                    'Crown Heights':(1,1,0),
+                    'Crown Heights Plaza':(0,0,0)}
         
         
         self.expected_id_nozeros = {0:2,
@@ -98,6 +103,23 @@ class TestSearchFunctions(unittest.TestCase):
             
             with self.subTest(k = k):
                 self.assertEqual(self.expected_id_nozeros[k], results[k])
+                
+    def test_empty_string(self):
+        
+        results = returnMatches(self.G, empty_string)
+        
+        for k in self.expected.keys():
+            
+            with self.subTest(k = k):
+                self.assertEqual(self.expected[k][2], results[k])
+                
+    def test_empty_string_nozeros(self):
+        results = returnMatches(self.G, empty_string, returnAll = False)
+        self.assertEqual(results, {})
+        
+
+        
+        
 
 
 if __name__ == '__main__':

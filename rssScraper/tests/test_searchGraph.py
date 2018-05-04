@@ -1,5 +1,6 @@
 import unittest
 import os, sys
+import csv
 
 if __name__ == '__main__':
     mypath = os.path.dirname(os.path.realpath('__file__'))
@@ -10,25 +11,26 @@ from entityFilter.makeGraphData import makeGraphData
 from entityFilter.SearchGraph import SearchGraph
 
 
-with open('test_places.txt','r') as r:
-    test_places = r.read().split('\n')
-    
-import csv
+#with open('test_places.txt','r') as r:
+#    test_places = r.read().split('\n')
+
 
 test_names_ids = list()
 with open('place_names_and_ids.csv', 'r') as testfile:
     reader = csv.reader(testfile, delimiter = ',')
     for r in reader:
         test_names_ids.append((r[0], int(r[1])))
-    
+        
 
+test_places = [n[0] for n in test_names_ids]
+    
 class TestSearchGraph(unittest.TestCase):
     
     def setUp(self):
         
-        R, V, E = makeGraphData(test_places)
+        R, _, E = makeGraphData(test_places)
         self.G = SearchGraph(R,test_names_ids,E)
-        
+     
         
         
     def test_neighbors(self):
