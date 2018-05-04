@@ -3,27 +3,27 @@
 -- place/location tables --
 CREATE TABLE media_markets(
 	market_id SERIAL PRIMARY KEY,
-	market_name TEXT
+	market_name TEXT UNIQUE NOT NULL
 );
 
 CREATE TABLE places(
   place_id SERIAL PRIMARY KEY,
-	place_name TEXT,
+	place_name TEXT NOT NULL,
+	geocode VARCHAR NOT NULL,
 	place_alias TEXT,
-	geocode VARCHAR,
   market_id INT REFERENCES media_markets(market_id)
 );
 
 CREATE TABLE region_relations(
-	subregion_id INT NOT NULL REFERENCES places(place_id),
-	parent_region_id INT NOT NULL REFERENCES places(place_id)
+	place_id INT REFERENCES places(place_id),
+	subplace_id INT REFERENCES places(place_id)
 );
 
 -- RSS source  --
 
 CREATE TABLE publishers(
 	pub_id SERIAL PRIMARY KEY,
-	publisher TEXT,
+	publisher TEXT NOT NULL,
 	market_id INT REFERENCES media_markets(market_id));
 
 -- RSS feed and article data --
@@ -31,7 +31,7 @@ CREATE TABLE publishers(
 CREATE TABLE feeds (
   feed_id SERIAL PRIMARY KEY,
 	publisher_id INT REFERENCES publishers(pub_id),
-	description	TEXT NOT NULL,
+	description	TEXT,
 	url			TEXT NOT NULL);
 
   -- XML_headline_tag TEXT DEFAULT NULL,
@@ -43,14 +43,13 @@ CREATE TABLE feeds (
 CREATE TABLE articles (
 	article_id SERIAL PRIMARY KEY,
 	feed_id INT NOT NULL REFERENCES feeds(feed_id),
+	content_id TEXT UNIQUE NOT NULL,
 	headline	TEXT NOT NULL,  -- title in RSS
-	internal_id TEXT NOT NULL,
 	date	DATE NOT NULL,      -- published in RSS
 	summary	TEXT,
 	wordcount INT,
 	page_number INT,
-	url	TEXT UNIQUE NOT NULL,
-	UNIQUE(feed_id, internal_id));
+	url	TEXT UNIQUE NOT NULL);
 
 
 

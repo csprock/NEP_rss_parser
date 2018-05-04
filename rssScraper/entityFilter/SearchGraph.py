@@ -1,7 +1,10 @@
 
 
 class EntityVertex:
-    
+    '''
+    Vertex object class for use with SearchGraph. Each vertex represents a named entity
+    to be searched for in strings. 
+    '''
     def __init__(self, n):
         self.name = n
         self.neighbors = set()
@@ -18,7 +21,10 @@ class EntityVertex:
             
 
 class SearchGraph:
-    
+    '''
+    Data structure for storing string-substring relationships between named entities for
+    the purpose of correctly counting the number of entities without overcounting. 
+    '''
     def __init__(self, root, V, E, directed = True):
         """ 
         V must be a list of names and E must be a list of tuples. For directed graphs,
@@ -47,6 +53,7 @@ class SearchGraph:
             print("v = %s, N(v) = %s" % (v, self.V[v].neighbors))
             
         
+    # resets graph for next search
     def reset(self):
         self.count_status = False
         
@@ -57,7 +64,7 @@ class SearchGraph:
         
 
     
-    
+    # deletes hypotenuse of directed triangles
     def prune(self):
         
         for v in self.V:

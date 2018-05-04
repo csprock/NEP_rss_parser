@@ -2,7 +2,19 @@ import re
 
 
 def CountMatches(G, string):
+    '''
+    Counts the number of times a node name in the graph is contained in the input string.
     
+    Input
+    -----
+    G: SearchGraph object
+    string: str
+    
+    Returns
+    ------
+    G: modified SearchGraph object
+    
+    '''
     # returns number of matches of expression in a string
     def _match(rex, string):
         temp = re.findall(rex, string)
@@ -21,21 +33,42 @@ def CountMatches(G, string):
 
 
 def NetMatches(G):
+    '''
+    Counts net matches of matched entities by subtracting matches from 
+    children to eliminate double countings. Traverses the graph using BFS. 
     
+    Input
+    -----
+    G: modified search graph returned by CountMatches()
+    
+    Returns
+    -------
+    G: modified search graph
+    '''
     # returns number of matches of expression in a string
     def _computeActual(G, v):
+        '''
+        Returns number of matches of expression in a string by subtracting
+        the number of matches of children from total number of matches.
         
+        Input
+        -----
+        G: SearchGraph object
+        v: name of node in SearchGraph
+        
+        Output
+        ------
+        net number of matches of the entity represented by vertex v
+        '''
         to_subtract = 0
         for u in G.V[v].neighbors:
             to_subtract += G.V[u].gross
         
         return G.V[v].gross - to_subtract
         
-    
     # assert count status has been set to true (CountMatches already run)
     assert G.count_status
         
-    
     for r in G.root:
         
         for v in G.V: G.V[v].visited = False

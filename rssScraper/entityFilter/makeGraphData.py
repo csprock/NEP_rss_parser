@@ -2,9 +2,9 @@ import re
 
 def nameType(place_list):
     """
-    This function takes a list of places as strings and determines the string-substring relationships 
-    between them. Strings represent places, so a substring represents a "parent" of a "child", e.g.
-    "San Francisco" would be the parent of "South San Francisco". 
+    This function takes a list of places as strings and determines the string-substring 
+    relationships between them. Strings represent places, so a substring represents a 
+    "parent" of a "child", e.g. "San Francisco" would be the parent of "South San Francisco". 
     
     Input
     -----
@@ -64,7 +64,8 @@ def nameType(place_list):
 
 def next_edge_set(place_name, place_list):
     """
-    This function returns a list of tuples of the form (place_name, places place_name is contained as a substring).
+    This function returns a list of tuples of the form 
+    (place_name, places place_name is contained as a substring).
     
     Input
     -----
@@ -96,7 +97,6 @@ def makeEdgeSet(place_list):
     Returns
     -------
     E: list of tuples
-    
     """
     
     place_list.sort(key = len)
