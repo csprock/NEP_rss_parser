@@ -90,16 +90,28 @@ def NetMatches(G):
 
         G.V[r].actual = G.V[r].gross - to_subtract
         
-    return {v: G.V[v].actual for v in G.V}
+    return G
 
 
 
 
 
-def returnMatches(G, string):
+def returnMatches(G, string, returnType = 'name', returnAll = True):
     
     G.reset()
     G = CountMatches(G, string)
-    matches = NetMatches(G)
+    G = NetMatches(G)
     
-    return matches
+    if returnType == 'name':
+        if returnAll:
+            output = {v: G.V[v].actual for v in G.V}
+        else:
+            output = {v: G.V[v].actual for v in G.V if G.V[v].actual > 0}
+            
+    elif returnType == 'id':
+        if returnAll:
+            output = {G.V[v].id: G.V[v].actual for v in G.V}
+        else:
+            output = {G.V[v].id: G.V[v].actual for v in G.V if G.V[v].actual > 0}
+    
+    return output

@@ -1,7 +1,6 @@
-
-
 import os, sys
 import unittest
+import csv
 
 if __name__ == '__main__':
     
@@ -17,6 +16,13 @@ if __name__ == '__main__':
         test_places = r.read().split('\n')
         
         
+
+    test_names_ids = list()
+    with open('place_names_and_ids.csv', 'r') as testfile:
+        reader = csv.reader(testfile, delimiter = ',')
+        for r in reader:
+            test_names_ids.append((r[0], int(r[1])))
+            
     with open('test_string.txt','r') as f:
         test_string = f.read()
     
@@ -25,8 +31,8 @@ class TestSearchFunctions(unittest.TestCase):
     
     def setUp(self):
         
-        R, V, E = makeGraphData(test_places)
-        self.G = SearchGraph(R, V, E)
+        R, _, E = makeGraphData(test_places)
+        self.G = SearchGraph(R, test_names_ids, E)
         self.G.prune()
         
         self.expected = {'Portland':(5,2), 
@@ -40,6 +46,15 @@ class TestSearchFunctions(unittest.TestCase):
                     'South San Jose Terrace':(1,1),
                     'Crown Heights':(1,1),
                     'Crown Heights Plaza':(0,0)}
+        
+        
+        self.expected_id_nozeros = {0:2,
+                                    7:1,
+                                    8:1,
+                                    9:1,
+                                    3:3,
+                                    5:1,
+                                    10:1}
         
     
     def test_CountMatches(self):
@@ -57,7 +72,7 @@ class TestSearchFunctions(unittest.TestCase):
     def test_NetMatches(self):
         
         self.G = CountMatches(self.G, test_string)
-        NetMatches(self.G)
+        self.G = NetMatches(self.G)
         
         for k in self.expected.keys():
             
@@ -74,6 +89,15 @@ class TestSearchFunctions(unittest.TestCase):
             
             with self.subTest(k = k):
                 self.assertEqual(self.expected[k][1], results[k])
+                
+    def test_returnMatches_id_nozeros(self):
+        
+        results = returnMatches(self.G, test_string, returnType = 'id', returnAll = False)
+        
+        for k in self.expected_id_nozeros.keys():
+            
+            with self.subTest(k = k):
+                self.assertEqual(self.expected_id_nozeros[k], results[k])
 
 
 if __name__ == '__main__':

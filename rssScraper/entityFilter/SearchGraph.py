@@ -6,7 +6,9 @@ class EntityVertex:
     to be searched for in strings. 
     '''
     def __init__(self, n):
-        self.name = n
+        self.name = n[0]
+        self.id = n[1]
+
         self.neighbors = set()
         self.visited = False
         
@@ -27,11 +29,11 @@ class SearchGraph:
     '''
     def __init__(self, root, V, E, directed = True):
         """ 
-        V must be a list of names and E must be a list of tuples. For directed graphs,
+        V must be a list of tuples of the form (name, id) and E must be a list of tuples. For directed graphs,
         the tuple (u,v) represents are arc from u to v.
         """
         self.count_status = False
-        self.V = {n:EntityVertex(n) for n in V}
+        self.V = {n[0]:EntityVertex(n) for n in V}
         self.root = root
         
         if directed:

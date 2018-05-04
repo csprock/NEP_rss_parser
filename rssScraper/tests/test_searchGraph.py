@@ -13,13 +13,21 @@ from entityFilter.SearchGraph import SearchGraph
 with open('test_places.txt','r') as r:
     test_places = r.read().split('\n')
     
+import csv
+
+test_names_ids = list()
+with open('place_names_and_ids.csv', 'r') as testfile:
+    reader = csv.reader(testfile, delimiter = ',')
+    for r in reader:
+        test_names_ids.append((r[0], int(r[1])))
+    
 
 class TestSearchGraph(unittest.TestCase):
     
     def setUp(self):
         
         R, V, E = makeGraphData(test_places)
-        self.G = SearchGraph(R,V,E)
+        self.G = SearchGraph(R,test_names_ids,E)
         
         
         
