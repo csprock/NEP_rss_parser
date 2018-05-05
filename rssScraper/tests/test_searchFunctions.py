@@ -50,10 +50,12 @@ class TestSearchFunctions(unittest.TestCase):
                     'South San Jose':(1,0,0),
                     'South San Jose Terrace':(1,1,0),
                     'Crown Heights':(1,1,0),
-                    'Crown Heights Plaza':(0,0,0)}
+                    'Crown Heights Plaza':(0,0,0),
+                    'Portland San Jose':(1,1,0)}
         
         
         self.expected_id_nozeros = {0:2,
+                                    2:1,
                                     7:1,
                                     8:1,
                                     9:1,
@@ -117,6 +119,10 @@ class TestSearchFunctions(unittest.TestCase):
         results = returnMatches(self.G, empty_string, returnAll = False)
         self.assertEqual(results, {})
         
+    def test_id_only(self):
+        
+        results = returnMatches(self.G, test_string, returnType = 'id', returnAll = False, id_only = True)
+        self.assertEqual(set(results), set(list(self.expected_id_nozeros.keys())))
 
         
         

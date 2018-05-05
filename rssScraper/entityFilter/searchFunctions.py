@@ -96,7 +96,7 @@ def NetMatches(G):
 
 
 
-def returnMatches(G, string, returnType = 'name', returnAll = True):
+def returnMatches(G, string, returnType = 'name', returnAll = True, id_only = False):
     
     G.reset()
     G = CountMatches(G, string)
@@ -113,5 +113,9 @@ def returnMatches(G, string, returnType = 'name', returnAll = True):
             output = {G.V[v].id: G.V[v].actual for v in G.V}
         else:
             output = {G.V[v].id: G.V[v].actual for v in G.V if G.V[v].actual > 0}
+            
+    if id_only:
+        return list(output.keys())
+    else:
+        return output
     
-    return output
