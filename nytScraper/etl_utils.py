@@ -1,8 +1,16 @@
-
-from resultsParser import processResults
 import datetime
-from psycopg2 import sql
-import psycopg2
+import time
+import os
+import sys
+
+mypath = os.path.dirname(os.path.realpath('__file__'))
+sys.path.append(os.path.join(mypath, os.path.pardir))
+
+from database_utils import execute_query
+from database_utils import generate_article_query, generate_tag_query, generate_keyword_query
+from results_parser import process_results
+from articleAPI import articleAPI
+
 
 class KEYRING:
     """
@@ -50,21 +58,12 @@ class KEYRING:
             return None
 
 
-
-
-#
 #keyring = KEYRING(API_KEYS)
 #
 #keyring.checkKeys()
 #keyring.updateStatus('d7117d6c63404420b03ee92aa4ec9806', False)
 
-
-
-
-
-
-
-def executeQuery(api_obj, **kwargs):
+def execute_api_query(api_obj, verbose = False, **kwargs):
 
     """
     Is a wrapper function for the articleAPI.search() function that parses return messages
@@ -72,6 +71,8 @@ def executeQuery(api_obj, **kwargs):
     The arguments are passed to the articleAPI.search() function and the results of the function parsed. 
     A dictionary containing the information about status messages and the data if the query execution
     was successful.
+    
+    Data returned by the API is processed by the process_results() function and returned as a 
     
     Performs following checks: 
         - checks the return status of the packet
@@ -92,11 +93,13 @@ def executeQuery(api_obj, **kwargs):
     Returns
     -------
     status: bool
-        returns True when there are results to parse. Returns false of any of the following are true:
-    output_data: 
-        results['response']['docs'] or NoneType depending on results of query
+        returns True when there are results to parse.
+    output_data: list of dict or None
+        list of dict returned by process_results() or None if no results or unsuccessful query
     api_limit: bool
         True if API limit rate exceeded
+    hits: int
+        number of returned search hits
 
     """
     
@@ -123,15 +126,15 @@ def executeQuery(api_obj, **kwargs):
             
             if hits == 0:
                 output_status = False
-                print("No results found.")
+                if verbose: print("No results found.")
                    
             else:
                 output_status = True
                 #output_data = results['response']['docs']
-                output_data = processResults(results)
+                output_data = process_results(results)
         else:
             output_status = False
-            print("Error")
+            if verbose: print("Error")
 
 
     except KeyError:      
@@ -139,27 +142,27 @@ def executeQuery(api_obj, **kwargs):
         
         # checks for message in the return packet
         if results['message'] == 'API rate limit exceeded':
-            print(results['message'])
+            if verbose: print(results['message'])
             api_limit = True
         else:
-            print(results['message'])
+            if verbose: print(results['message'])
             
     
     return {'status':output_status, 'api_status': api_limit, 'data':output_data, 'hits': hits}
 
 
 
-def connectToDatabase(conn_info, success_message = True):
-    conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])
-    try:
-        conn = psycopg2.connect(conn_string)
-        if success_message is True:
-            print("Connected to database %s." % (conn_info['dbname']))
-            
-        return conn
-    except:
-        print('Error! Failure to connect to database %s' % (conn_info['dbname']))
-
+#def connectToDatabase(conn_info, success_message = True):
+#    conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])
+#    try:
+#        conn = psycopg2.connect(conn_string)
+#        if success_message is True:
+#            print("Connected to database %s." % (conn_info['dbname']))
+#            
+#        return conn
+#    except:
+#        print('Error! Failure to connect to database %s' % (conn_info['dbname']))
+#
 
 
 ###############################################################################
@@ -167,7 +170,7 @@ def connectToDatabase(conn_info, success_message = True):
 # to be updated if the database is updated
 
 
-def makeArticleTuple(feed_id, data, as_dict = False):
+def make_article_tuple(feed_id, data, as_dict = False):
     
     date_parts = list(map(int, data['date'].split("-")))
     
@@ -178,7 +181,6 @@ def makeArticleTuple(feed_id, data, as_dict = False):
         output['headline'] = data['headline']
         output['date'] = datetime.date(date_parts[0], date_parts[1], date_parts[2])
         output['summary'] = data['snippet']
-        output['byline'] = None
         output['wordcount'] = data['word_count']
         output['page_number'] = data['page']
         output['url'] = data['url']
@@ -187,7 +189,6 @@ def makeArticleTuple(feed_id, data, as_dict = False):
                     data['headline'],
                     datetime.date(date_parts[0],date_parts[1],date_parts[2]),
                     data['snippet'],
-                    None,
                     data['word_count'],
                     data['page'],
                     data['url'])
@@ -196,7 +197,7 @@ def makeArticleTuple(feed_id, data, as_dict = False):
 
 
 
-def makePlaceMentionsTuple(article_id, place_id, as_dict = False):
+def make_place_tag_tuple(article_id, place_id, as_dict = False):
     
     if as_dict:
         output = dict()
@@ -208,89 +209,200 @@ def makePlaceMentionsTuple(article_id, place_id, as_dict = False):
     return output
 
 
-
-class databaseInserter:
+def make_keyword_tuples(article_id, data, as_dict = False):
     
+    output = list()
     
-
-    def __init__(self, conn_info):
+    if as_dict:
+        for kw in data['keywords']:
+            output.append(dict(article_id = article_id, tag = kw[0], keyword = kw[1]))
+    else:
+        for kw in data['keywords']:
+            output.append((article_id, kw[0], kw[1]))
         
-        self.CONN = connectToDatabase(conn_info)
-        
-        self.base_query_1 = '''
-        WITH input_rows({}) AS (VALUES ({})), ins AS (INSERT INTO {}({}) 
-        SELECT * FROM input_rows ON CONFLICT (url) DO NOTHING RETURNING id) 
-        SELECT 'inserted' AS source, id FROM ins UNION ALL 
-        (SELECT 'selected' AS source, {}.id FROM input_rows JOIN {} USING(url))
-        '''
-        
-        self.base_query_2 = "INSERT INTO {}({}) VALUES ({})"
-        
-        self.duplicates = []
-        
-        
-        
-    def _generateSQL_1(self, values):
+    return output
     
-        f_dict = {k:v for k, v in values.items() if v != None}
-        
-        field_names = f_dict.keys()
-        
-        # create SQL variables
-        table_name = sql.Identifier('articles')
-        fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
-        placeholders = sql.SQL(', ').join(map(sql.Placeholder,field_names))
-        
-        # feed variables to psycopg2's sql statement formatter
-        q = sql.SQL(self.base_query_1).format(fields, placeholders, table_name, fields, table_name, table_name)
-        return q
+     
+def execute_insertions_nyt(conn, data, feed_id, place_id):
+    # connection, data, feed_id (for NYT API), place_id
+    
+    article_dict = make_article_tuple(feed_id, data, as_dict = True)
+    q_article = generate_article_query(list(article_dict.keys()))
+    
+    results = execute_query(conn, q_article, data = article_dict, return_values = True)    
+    article_id = results[0][1]
+    
+    tag_dict = make_place_tag_tuple(article_id, place_id, as_dict = True)
+    q_tag = generate_tag_query(list(tag_dict.keys()))
+    
+    execute_query(conn, q_tag, data = tag_dict, return_values = False)
+    
+    keyword_dicts = make_keyword_tuples(article_id, data, as_dict = True)
+    if len(keyword_dicts) > 0:
+        q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
+        for k in keyword_dicts:
+            execute_query(conn, q_keyword, data = k, return_values = False)
     
 
-    def _generateSQL_2(self, values):
     
-        field_names = values.keys()
-        
-        # create SQL variables
-        table_name = sql.Identifier('place_mentions')
-        fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
-        placeholders = sql.SQL(', ').join(map(sql.Placeholder,field_names))
-        
-        # feed variables to psycopg2's sql statement formatter
-        q = sql.SQL(self.base_query_2).format(table_name, fields, placeholders)
-        return q
+class nytScraper:
     
+    def __init__(self, key):
+        self.KEYRING = KEYRING(key)
+
+    def run_query(self, page_range, verbose = False, **kwargs):
     
+        if isinstance(page_range, list):
+            current_page, stop_page = page_range[0], page_range[1]
+        elif page_range == 'all':
+            current_page, stop_page = 0, 200
+        else:
+            raise ValueError("Must supply list of form [start_page, end_page] or 'all'.")
+            
+        # initialize variables
+        current_key = self.KEYRING.nextKey()             # set current API key to use
+        api_obj = articleAPI(current_key)                # initialize articleAPI object using current_key
         
-    def executeInsertion(self, feed_id, place_id, data):
+        results_list = list()                            # initialize list where results of queries will be stored
         
-        valueTuple1 = makeArticleTuple(feed_id, data, as_dict = True)
-        q1 = self._generateSQL_1(valueTuple1)
         
-        with self.CONN as conn:
-            with conn.cursor() as curs:
-                curs.execute(q1, valueTuple1)
-                returned_id = curs.fetchall()
+        # Check the number of hits and the number of pages needed to download all of them. 
+        # If number of pages exceeds maximum allowed by the API (200), returns exception. 
+        #kwargs['page']  = current_page
+        results = execute_api_query(api_obj, page = current_page, **kwargs)
+        hits = results['hits']
+        
+        if hits == 0 or hits == None:
+            return None
+        
+        hits_pages = hits // 10
+    
+        if hits_pages > 200:
+            raise ValueError("The number of pages will exceed 200! Number of hits is " + str(hits))
+        else:
+            if verbose: print("Number of results pages: " + str(hits_pages) + " Number of hits: " + str(hits))
+        
+        
+        while True: # loop runs until stop condition breaks it
+            
+            # patch to fix expanding string bug inside fq and other dictionary kwargs
+            # does not effect string kwargs
+            for k in kwargs.keys():
+                if isinstance(kwargs[k], dict):
+                    for u in kwargs[k].keys():
+                        if isinstance(kwargs[k][u], str):
+                            kwargs[k][u] = kwargs[k][u].replace('"', '').strip()
+             
+                
+            time.sleep(1)
+            
+            results = execute_api_query(api_obj, page = current_page, **kwargs)
+            
+            if results['status'] == True:
+                
+                results_list.extend(results['data'])
+                if verbose: print("Status: OK. Current page: " + str(current_page))
+                current_page += 1
+    
+            else:
+                # check API status, if API limit reached set status of current key to False and update current key
+                # If all keys have reached their limits, print message and break.
+                
+                if results['api_status']:
+                    self.KEYRING.updateStatus(current_key, False)
+                    
+                    # if there is another usable key, set current_key to this key otherwise breaks main loop.
+                    if self.KEYRING.status():
+                        current_key = self.KEYRING.nextKey()
+                        api_obj = articleAPI(current_key)
+                        
+                    else:
+                        if verbose: print("All API keys have reached their limits.")
+                        break
+                    
+    
+            if current_page > min([hits_pages, stop_page]):
+                break
+            
+        return results_list
+
+
+
+#class databaseInserter:
+#    
+#    
+#
+#    def __init__(self, conn_info):
+#        
+#        self.CONN = connect_to_database(conn_info)
+#        
+#        self.base_query_1 = '''
+#        WITH input_rows({}) AS (VALUES ({})), ins AS (INSERT INTO {}({}) 
+#        SELECT * FROM input_rows ON CONFLICT (url) DO NOTHING RETURNING id) 
+#        SELECT 'inserted' AS source, id FROM ins UNION ALL 
+#        (SELECT 'selected' AS source, {}.id FROM input_rows JOIN {} USING(url))
+#        '''
+#        
+#        self.base_query_2 = "INSERT INTO {}({}) VALUES ({})"
+#        
+#        self.duplicates = []
+#        
+#        
+#        
+#    def _generateSQL_1(self, values):
+#    
+#        f_dict = {k:v for k, v in values.items() if v != None}
+#        
+#        field_names = f_dict.keys()
+#        
+#        # create SQL variables
+#        table_name = sql.Identifier('articles')
+#        fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
+#        placeholders = sql.SQL(', ').join(map(sql.Placeholder,field_names))
+#        
+#        # feed variables to psycopg2's sql statement formatter
+#        q = sql.SQL(self.base_query_1).format(fields, placeholders, table_name, fields, table_name, table_name)
+#        return q
+#    
+#
+#    def _generateSQL_2(self, values):
+#    
+#        field_names = values.keys()
+#        
+#        # create SQL variables
+#        table_name = sql.Identifier('place_mentions')
+#        fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
+#        placeholders = sql.SQL(', ').join(map(sql.Placeholder,field_names))
+#        
+#        # feed variables to psycopg2's sql statement formatter
+#        q = sql.SQL(self.base_query_2).format(table_name, fields, placeholders)
+#        return q
+#    
+#    
+#        
+#    def executeInsertion(self, feed_id, place_id, data):
+#        
+#        valueTuple1 = make_article_tuple(feed_id, data, as_dict = True)
+#        q1 = self._generateSQL_1(valueTuple1)
+#        
+#        with self.CONN as conn:
+#            with conn.cursor() as curs:
+#                curs.execute(q1, valueTuple1)
+#                returned_id = curs.fetchall()
+#                
+#        
+#        if returned_id[0][0] == 'selected':
+#            print("Duplicate found at article_id: %s" % str(returned_id[0][1]))
+#            self.duplicates.append((returned_id[0][1], place_id))
+#            
+#            
+#        
+#        valueTuple2 = make_place_tag_tuple(returned_id[0][1], place_id, as_dict = True)
+#        q2 = self._generateSQL_2(valueTuple2)
+#        
+#        with self.CONN as conn:
+#            with conn.cursor() as curs:
+#                curs.execute(q2, valueTuple2)
                 
         
-        if returned_id[0][0] == 'selected':
-            print("Duplicate found at article_id: %s" % str(returned_id[0][1]))
-            self.duplicates.append((returned_id[0][1], place_id))
-            
-            
-        
-        valueTuple2 = makePlaceMentionsTuple(returned_id[0][1], place_id, as_dict = True)
-        q2 = self._generateSQL_2(valueTuple2)
-        
-        with self.CONN as conn:
-            with conn.cursor() as curs:
-                curs.execute(q2, valueTuple2)
-                
-        
-
-
-
-
-
-
-
         

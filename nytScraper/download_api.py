@@ -1,62 +1,48 @@
-
-
-
-from queryAPI import nytScraper
-
-from etl_config import CONN_INFO, API_KEYS
-import pandas as pd
-import json
+import os
+import sys
 import time
+import json
 
-q = "SELECT id, place_name, geocode FROM places WHERE market_id = 2"
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), os.path.pardir))
 
-places = executeSQL_select(q, None, CONN_INFO)
+from database_utils import connect_to_database, execute_query
+from etl_utils import nytScraper, execute_insertions_nyt
+
+
+CONN_INFO = {'dbname': os.environ['DB_NAME'],
+             'username':os.environ['DB_USERNAME'],
+             'password':os.environ['DB_PASSWORD'],
+             'host':os.environ['DB_HOST']}
+
+API_KEYS = os.environ['API_KEYS'].split(',')
+
+
+conn = connect_to_database(CONN_INFO)
+
+market_id = 1
+q = "SELECT place_name, place_id FROM places WHERE market_id = %s"
+place_list = execute_query(conn, q, data = (market_id, ), return_values = True)
+
 
 apiScraper = nytScraper(API_KEYS)
 
-#db_inserter = databaseInserter(CONN_INFO)
-
 results = list()
-
-for p in places.iterrows():
-    p_id = p[1][0]
-    p_name = p[1][1]
+for p in place_list[:3]:
+    p_name, p_id = p[0], p[1]
     time.sleep(1)
     print(p_name)
-    r = apiScraper.runQuery('all', q = '"' + p_name + '"', fq = {'glocations':'New York City'}, begin_date = 20180301 , end_date = 20180331)
+    r = apiScraper.run_query(page_range = 'all', q = '"' + p_name + '"', fq = {'glocations':'New York City'}, begin_date = 20180301 , end_date = 20180331)
     results.append( dict(place_id = p_id, query_results = r ) )
     
 
-with open('C:/Users/csprock/Documents/Projects/Data Journalism/News Inequality Project/Data/march_downloads.json', 'w') as f:
-    json.dump(results, f)
+results = list(filter(lambda x: x['query_results'] != None, results))
 
+#with open('/home/carson/Documents/NIP/Data/march_downloads.json', 'w') as f:
+#    json.dump(results, f)
 
+#with open('C:/Users/csprock/Documents/Projects/Data Journalism/News Inequality Project/Data/march_downloads.json') as f:
+#    data = json.load(f)
 
-from etl_config import CONN_INFO
-from etl_utils import databaseInserter
-
-with open('C:/Users/csprock/Documents/Projects/Data Journalism/News Inequality Project/Data/march_downloads.json') as f:
-    data = json.load(f)
-    
-
-
-data = list(filter(lambda x: x['query_results'] != None, data))
-
-
-
-db_inserter = databaseInserter(CONN_INFO)   
-    
-    
-for d in data:
-    time.sleep(0.1)
-    
-    
-    c = 0
-    for r in d['query_results']:
-        time.sleep(0.1)
-        db_inserter.executeInsertion(5, d['place_id'], r)
-        c += 1
-    print("Finished writing %s entries from place_id %s" % (str(c), d['place_id']))
-        
-        
-    
+feed_id = 4
+for r in results:
+    execute_insertions_nyt(conn, r['query_results'], feed_id, r['place_id'])
