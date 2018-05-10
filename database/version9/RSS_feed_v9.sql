@@ -80,3 +80,9 @@ CREATE TABLE keywords(
 	keyword TEXT,
 	PRIMARY KEY(article_id, tag, keyword)
 );
+
+CREATE TABLE bylines(
+	article_id INT REFERENCES articles(article_id),
+	fullname VARCHAR(75),
+	PRIMARY KEY(article_id, fullname)
+);

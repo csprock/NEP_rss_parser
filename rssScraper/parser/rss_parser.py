@@ -26,6 +26,7 @@ SG = make_place_filter(conn, market_id)
 q = "SELECT feed_id, url FROM publishers INNER JOIN feeds ON publishers.pub_id = feeds.pub_id WHERE market_id = %s"
 
 feeds = execute_query(conn, query = q, data = (market_id, ), return_values = True)
+feeds = feeds[:2]
 
 parsed_results = list()
 for f in feeds:

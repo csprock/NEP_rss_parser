@@ -150,101 +150,6 @@ def execute_api_query(api_obj, verbose = False, **kwargs):
     
     return {'status':output_status, 'api_status': api_limit, 'data':output_data, 'hits': hits}
 
-
-
-#def connectToDatabase(conn_info, success_message = True):
-#    conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])
-#    try:
-#        conn = psycopg2.connect(conn_string)
-#        if success_message is True:
-#            print("Connected to database %s." % (conn_info['dbname']))
-#            
-#        return conn
-#    except:
-#        print('Error! Failure to connect to database %s' % (conn_info['dbname']))
-#
-
-
-###############################################################################
-# the following functions are specific to the database schema and will have
-# to be updated if the database is updated
-
-
-def make_article_tuple(feed_id, data, as_dict = False):
-    
-    date_parts = list(map(int, data['date'].split("-")))
-    
-    
-    if as_dict:
-        output = dict()
-        output['feed_id'] = feed_id
-        output['headline'] = data['headline']
-        output['date'] = datetime.date(date_parts[0], date_parts[1], date_parts[2])
-        output['summary'] = data['snippet']
-        output['wordcount'] = data['word_count']
-        output['page_number'] = data['page']
-        output['url'] = data['url']
-    else:
-        output = (feed_id,  
-                    data['headline'],
-                    datetime.date(date_parts[0],date_parts[1],date_parts[2]),
-                    data['snippet'],
-                    data['word_count'],
-                    data['page'],
-                    data['url'])
-      
-    return output
-
-
-
-def make_place_tag_tuple(article_id, place_id, as_dict = False):
-    
-    if as_dict:
-        output = dict()
-        output['article_id'] = article_id
-        output['place_id'] = place_id
-    else:
-        output = (article_id, place_id)
-        
-    return output
-
-
-def make_keyword_tuples(article_id, data, as_dict = False):
-    
-    output = list()
-    
-    if as_dict:
-        for kw in data['keywords']:
-            output.append(dict(article_id = article_id, tag = kw[0], keyword = kw[1]))
-    else:
-        for kw in data['keywords']:
-            output.append((article_id, kw[0], kw[1]))
-        
-    return output
-    
-     
-def execute_insertions_nyt(conn, data, feed_id, place_id):
-    # connection, data, feed_id (for NYT API), place_id
-    
-    article_dict = make_article_tuple(feed_id, data, as_dict = True)
-    q_article = generate_article_query(list(article_dict.keys()))
-    
-    results = execute_query(conn, q_article, data = article_dict, return_values = True)    
-    article_id = results[0][1]
-    
-    tag_dict = make_place_tag_tuple(article_id, place_id, as_dict = True)
-    q_tag = generate_tag_query(list(tag_dict.keys()))
-    
-    execute_query(conn, q_tag, data = tag_dict, return_values = False)
-    
-    keyword_dicts = make_keyword_tuples(article_id, data, as_dict = True)
-    if len(keyword_dicts) > 0:
-        q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
-        for k in keyword_dicts:
-            execute_query(conn, q_keyword, data = k, return_values = False)
-    
-
-    
 class nytScraper:
     
     def __init__(self, key):
@@ -326,6 +231,119 @@ class nytScraper:
             
         return results_list
 
+
+def generate_dates():
+    
+    def _datestr(date_object):
+        
+        year = str(date_object.year)
+        month = str(date_object.month)
+        day = str(date_object.day)
+        
+        if len(day) == 1:
+            day = '0' + day
+        if len(month) == 1:
+            month = '0' + month
+            
+        return year + month + day
+
+    today = datetime.date.today()
+    dt = datetime.timedelta(days = 1)
+    yesterday = today - dt
+    
+    return _datestr(today), _datestr(yesterday)
+
+###############################################################################
+# the following functions are specific to the database schema and will have
+# to be updated if the database is updated
+
+
+def make_article_tuple(feed_id, data, as_dict = False):
+    
+    date_parts = list(map(int, data['date'].split("-")))
+    
+    
+    if as_dict:
+        output = dict()
+        output['feed_id'] = feed_id
+        output['headline'] = data['headline']
+        output['date'] = datetime.date(date_parts[0], date_parts[1], date_parts[2])
+        output['summary'] = data['snippet']
+        output['content_id'] = data['id']
+        output['url'] = data['url']
+        
+        try:
+            output['wordcount'] = int(data['word_count'])
+        except:
+            pass
+        
+        try:
+            output['page_number'] = int(data['page'])
+        except:
+            pass
+            
+    else:
+        output = (feed_id,  
+                    data['id'],
+                    data['headline'],
+                    datetime.date(date_parts[0],date_parts[1],date_parts[2]),
+                    data['snippet'],
+                    data['word_count'],
+                    data['page'],
+                    data['url'])
+      
+    return output
+
+
+
+def make_place_tag_tuple(article_id, place_id, as_dict = False):
+    
+    if as_dict:
+        output = dict()
+        output['article_id'] = article_id
+        output['place_id'] = place_id
+    else:
+        output = (article_id, place_id)
+        
+    return output
+
+
+def make_keyword_tuples(article_id, data, as_dict = False):
+    
+    output = list()
+    
+    if as_dict:
+        for kw in data['keywords']:
+            output.append(dict(article_id = article_id, tag = kw[0], keyword = kw[1]))
+    else:
+        for kw in data['keywords']:
+            output.append((article_id, kw[0], kw[1]))
+        
+    return output
+    
+     
+def execute_insertions_nyt(conn, data, feed_id, place_id):
+    # connection, data, feed_id (for NYT API), place_id
+    
+    article_dict = make_article_tuple(feed_id, data, as_dict = True)
+    q_article = generate_article_query(list(article_dict.keys()))
+    
+    results = execute_query(conn, q_article, data = article_dict, return_values = True)    
+    article_id = results[0][1]
+    
+    tag_dict = make_place_tag_tuple(article_id, place_id, as_dict = True)
+    q_tag = generate_tag_query(list(tag_dict.keys()))
+    
+    execute_query(conn, q_tag, data = tag_dict, return_values = False)
+    
+#    keyword_dicts = make_keyword_tuples(article_id, data, as_dict = True)
+#    if len(keyword_dicts) > 0:
+#        q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
+#        for k in keyword_dicts:
+#            execute_query(conn, q_keyword, data = k, return_values = False)
+    
+
+    
 
 
 #class databaseInserter:
