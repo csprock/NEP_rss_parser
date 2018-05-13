@@ -336,11 +336,11 @@ def execute_insertions_nyt(conn, data, feed_id, place_id):
     
     execute_query(conn, q_tag, data = tag_dict, return_values = False)
     
-#    keyword_dicts = make_keyword_tuples(article_id, data, as_dict = True)
-#    if len(keyword_dicts) > 0:
-#        q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
-#        for k in keyword_dicts:
-#            execute_query(conn, q_keyword, data = k, return_values = False)
+    keyword_dicts = make_keyword_tuples(article_id, data, as_dict = True)
+    if len(keyword_dicts) > 0:
+        q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
+        for k in keyword_dicts:
+            execute_query(conn, q_keyword, data = k, return_values = False)
     
 
     

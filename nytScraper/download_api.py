@@ -34,18 +34,17 @@ for p in place_list:
     
 results = list(filter(lambda x: x['query_results'] != None, results))
 
-
-counter = 0
-
-import json
-#with open('/home/carson/Documents/NIP/Data/test_downloads.json', 'w') as f:
-#    json.dump(results, f)
 #
-with open('/home/carson/Documents/NIP/Data/test_downloads.json') as f:
-    results = json.load(f)
+#counter = 0
+#
+#import json
+##with open('/home/carson/Documents/NIP/Data/test_downloads.json', 'w') as f:
+##    json.dump(results, f)
+##
+#with open('/home/carson/Documents/NIP/Data/test_downloads.json') as f:
+#    results = json.load(f)
 
 feed_id = 4
 for r_list in results:
     for r in r_list['query_results']:
         execute_insertions_nyt(conn, r, feed_id, r_list['place_id'])
-        counter += 1

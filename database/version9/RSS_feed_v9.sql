@@ -36,7 +36,7 @@ CREATE TABLE feeds(
   feed_id SERIAL PRIMARY KEY,
 	pub_id INT REFERENCES publishers(pub_id),
 	description	TEXT,
-	url			TEXT UNIQUE NOT NULL);
+	url			TEXT UNIQUE);
 
   -- XML_headline_tag TEXT DEFAULT NULL,
   -- XML_subhed_tag TEXT DEFAULT NULL,
@@ -81,8 +81,8 @@ CREATE TABLE keywords(
 	PRIMARY KEY(article_id, tag, keyword)
 );
 
-CREATE TABLE bylines(
-	article_id INT REFERENCES articles(article_id),
-	fullname VARCHAR(75),
-	PRIMARY KEY(article_id, fullname)
-);
+--CREATE TABLE bylines(
+--	article_id INT REFERENCES articles(article_id),
+--	fullname VARCHAR(75),
+--	PRIMARY KEY(article_id, fullname)
+--);
