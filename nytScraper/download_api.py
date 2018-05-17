@@ -1,50 +1,61 @@
 import os
 import sys
 import time
+import json
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), os.path.pardir))
 
-from database_utils import connect_to_database, execute_query
-from etl_utils import nytScraper, execute_insertions_nyt, generate_dates
+from database_utils import connect_to_database, execute_query, CONN_INFO
+from etl_utils import nytScraper, execute_insertions_nyt, generate_dates, execute_api_search
 
-
-CONN_INFO = {'dbname': os.environ['DB_NAME'],
-             'username':os.environ['DB_USERNAME'],
-             'password':os.environ['DB_PASSWORD'],
-             'host':os.environ['DB_HOST']}
+# define session constants
 API_KEYS = os.environ['API_KEYS'].split(',')
 TODAY, YESTERDAY = generate_dates()
+MARKET_ID = 1
+FEED_ID = 4
+RERUN_PATH = '/home/carson/Documents/NIP/NewsInequalityProjectETL/reruns.json'
+
+apiScraper = nytScraper(API_KEYS)
+
+# execute any reruns from last session
+with open(RERUN_PATH, 'r') as f:
+    to_rerun = json.load(f)
+
+results, reruns = list(), list()
+if len(to_rerun) > 0:
+
+    for data in to_rerun:
+
+        today = datetime.date(year = data['date']['today'][0], month = data['date']['today'][1], day = data['date']['today'][2])
+        yesterday = datetime.date(year = data['date']['yesterday'][0], month = data['date']['yesterday'][1], day = data['date']['yesterday'][2])
+
+        old_results, old_reruns = execute_api_search(scraper = apiScraper, place_list = data['place_list'], market_id = MARKET_ID, today = today, yesterday = yesterday)
+        results.extend(old_results)
+        reruns.extend(old_reruns)
 
 
 conn = connect_to_database(CONN_INFO)
 
-market_id = 1
 q = "SELECT place_name, place_id FROM places WHERE market_id = %s"
-place_list = execute_query(conn, q, data = (market_id, ), return_values = True)
+place_list = execute_query(conn, q, data = (MARKET_ID, ), return_values = True)
 
-apiScraper = nytScraper(API_KEYS)
+new_results, new_reruns = execute_api_search(scraper = apiScraper, place_list = place_list, market_id = MARKET_ID, today = TODAY, yesterday = YESTERDAY)
 
-results = list()
-for p in place_list:
-    p_name, p_id = p[0], p[1]
-    time.sleep(1)
-    print(p_name)
-    r = apiScraper.run_query(page_range = 'all', q = '"' + p_name + '"', fq = {'glocations':'New York City'}, begin_date = YESTERDAY , end_date = TODAY)
-    results.append( dict(place_id = p_id, query_results = r ) )
-    
-results = list(filter(lambda x: x['query_results'] != None, results))
+results.extend(new_results)
 
-#
-#counter = 0
-#
-#import json
-##with open('/home/carson/Documents/NIP/Data/test_downloads.json', 'w') as f:
-##    json.dump(results, f)
-##
-#with open('/home/carson/Documents/NIP/Data/test_downloads.json') as f:
-#    results = json.load(f)
+try:
+    reruns.extend(new_reruns)
+except TypeError:
+    pass
 
-feed_id = 4
+# serialize reruns
+with open(RERUN_PATH, 'w') as f:
+    json.dump(reruns, f)
+
+
+
 for r_list in results:
     for r in r_list['query_results']:
-        execute_insertions_nyt(conn, r, feed_id, r_list['place_id'])
+        execute_insertions_nyt(conn, r, FEED_ID, r_list['place_id'])
+
+conn.close()

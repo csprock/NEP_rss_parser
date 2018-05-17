@@ -1,5 +1,13 @@
+import os
 import psycopg2
 from psycopg2 import sql
+
+
+
+CONN_INFO = {'dbname': os.environ['DB_NAME'],
+             'username':os.environ['DB_USERNAME'],
+             'password':os.environ['DB_PASSWORD'],
+             'host':os.environ['DB_HOST']}
 
 def connect_to_database(conn_info, success_message = True):
     conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])

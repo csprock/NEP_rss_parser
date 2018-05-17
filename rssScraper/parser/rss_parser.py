@@ -6,36 +6,39 @@ main_module = os.path.join(mypath, os.pardir + '/..')
 sys.path.append(main_module)
 
 from parsing_utils import make_place_filter, parse_feed, execute_insertions
-from database_utils import connect_to_database, execute_query
+from database_utils import connect_to_database, execute_query, CONN_INFO
 
+conn = connect_to_database(CONN_INFO)
 
-conn_info = {'dbname': os.environ['DB_NAME'],
-       # 'dbname':'test_database',
-             'username':os.environ['DB_USERNAME'],
-             'password':os.environ['DB_PASSWORD'],
-             'host':os.environ['DB_HOST']}
+q1 = '''
+    SELECT market_id FROM media_markets WHERE market_id IN (SELECT DISTINCT(places.market_id) FROM places)
+    '''
 
+markets = execute_query(conn, q1, data = None, return_values = True)
 
-
-conn = connect_to_database(conn_info)
+q2 = '''
+    SELECT feed_id, url FROM publishers INNER JOIN feeds ON publishers.pub_id = feeds.pub_id 
+    WHERE market_id = %s AND url IS NOT NULL
+    '''
 
 # given media market, cycle through all publishers and feeds
-
-market_id = 1
-SG = make_place_filter(conn, market_id)
-q = "SELECT feed_id, url FROM publishers INNER JOIN feeds ON publishers.pub_id = feeds.pub_id WHERE market_id = %s"
-
-feeds = execute_query(conn, query = q, data = (market_id, ), return_values = True)
-feeds = feeds[:2]
-
-parsed_results = list()
-for f in feeds:
-    temp = parse_feed(f[1], f[0], SG)
-    if temp is not None:
-        parsed_results.extend(temp)
+for m_id in markets:
     
+    market_id = m_id[0]
+
+    SG = make_place_filter(conn, market_id)
     
-if parsed_results is not None:
-    for r in parsed_results:
-        execute_insertions(r, conn)
+    feeds = execute_query(conn, query = q2, data = (market_id, ), return_values = True)
+    
+    parsed_results = list()
+    for f in feeds:
+        temp = parse_feed(f[1], f[0], SG)
+        if temp is not None:
+            parsed_results.extend(temp)
         
+        
+    if parsed_results is not None:
+        for r in parsed_results:
+            execute_insertions(r, conn)
+        
+conn.close()
