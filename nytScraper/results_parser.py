@@ -74,10 +74,7 @@ def format_doc(article):
     document['url'] = article['web_url']
     document['date'] = article['pub_date'].split("T")[0]    # extract date part from date/time stamp
 
-    try:
-        document['byline'] = _extract_authors(article['original'])
-    except:
-        document['byline'] = None
+
     
     try:
         document['keywords'] = _extract_keywords(article['keywords'])
@@ -103,13 +100,13 @@ def format_doc(article):
     except KeyError:
         document['source'] = None
     
-    # byline
-    try:
-        document['original'] = _extract_authors(article['byline']['original'])
-    except TypeError:
-        document['original'] = None
-    except KeyError:
-        document['original'] = None
+#    # byline
+#    try:
+#        document['original'] = _extract_authors(article['byline']['original'])
+#    except TypeError:
+#        document['original'] = None
+#    except KeyError:
+#        document['original'] = None
 
     # lead paragraph
     try:

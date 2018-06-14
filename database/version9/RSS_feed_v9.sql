@@ -47,7 +47,7 @@ CREATE TABLE feeds(
 CREATE TABLE articles(
 	article_id SERIAL PRIMARY KEY,
 	feed_id INT NOT NULL REFERENCES feeds(feed_id),
-	content_id TEXT UNIQUE NOT NULL,
+	content_id TEXT UNIQUE,
 	headline	TEXT NOT NULL,  -- title in RSS
 	date	DATE NOT NULL,      -- published in RSS
 	summary	TEXT,

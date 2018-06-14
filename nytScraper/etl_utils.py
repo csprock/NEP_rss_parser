@@ -363,8 +363,7 @@ def execute_api_search(scraper, place_list, market_id, yesterday, today):
     results = list(filter(lambda x: x['query_results'] != None, results))
     # format rejected queries for JSON storage
     if len(rejects) > 0:
-        rejects = {'dates':{'yesterday':[yesterday.year, yesterday.month, yesterday.day],
-                                'today':[today.year, today.month, today.day]},
+        rejects = {'dates':{'yesterday':yesterday, 'today':today},
                     'place_list':rejects}
     else:
         rejects = None

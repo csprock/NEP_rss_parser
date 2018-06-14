@@ -38,7 +38,11 @@ def make_place_filter(conn_obj, market_id):
 def parse_entry(rss_entry):
     # need to add exception handling
     parsed_results = dict()
-    parsed_results['id'] = rss_entry.id
+    try:
+        parsed_results['id'] = rss_entry.id
+    except:
+        parsed_results['id'] = None
+        
     parsed_results['title'] = rss_entry.title
     parsed_results['link'] = rss_entry.link
     parsed_results['summary'] = re.sub('<.*?>', '', rss_entry.summary)  # filter out HTML tags

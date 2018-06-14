@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 import json
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), os.path.pardir))
@@ -26,8 +25,8 @@ if len(to_rerun) > 0:
 
     for data in to_rerun:
 
-        today = datetime.date(year = data['date']['today'][0], month = data['date']['today'][1], day = data['date']['today'][2])
-        yesterday = datetime.date(year = data['date']['yesterday'][0], month = data['date']['yesterday'][1], day = data['date']['yesterday'][2])
+        today = data['date']['today']
+        yesterday = data['date']['yesterday']
 
         old_results, old_reruns = execute_api_search(scraper = apiScraper, place_list = data['place_list'], market_id = MARKET_ID, today = today, yesterday = yesterday)
         results.extend(old_results)
@@ -44,7 +43,8 @@ new_results, new_reruns = execute_api_search(scraper = apiScraper, place_list = 
 results.extend(new_results)
 
 try:
-    reruns.extend(new_reruns)
+    reruns.append(new_reruns)
+    reruns = [r for r in reruns if r != None]   # bugfix for returned None
 except TypeError:
     pass
 
