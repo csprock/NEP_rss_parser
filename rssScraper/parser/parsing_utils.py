@@ -2,8 +2,14 @@ import datetime
 import re
 import os
 import sys
+import pickle
 
-from nltk.tokenize import sent_tokenize
+#from nltk.tokenize import sent_tokenize
+
+with open('english.pickle', 'rb') as file:
+    sent_tokenize = pickle.load(file)
+
+
 import feedparser
 
 
@@ -77,7 +83,7 @@ def generate_place_mention_info(parsed_results, G):
 
 
 
-    summary_sentences = sent_tokenize(parsed_results['summary'])
+    summary_sentences = sent_tokenize.tokenize(parsed_results['summary'])
     summary_place_mentions_tuples = list()
 
     for s in summary_sentences:
