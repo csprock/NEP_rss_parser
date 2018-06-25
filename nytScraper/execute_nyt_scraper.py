@@ -6,7 +6,7 @@ if __name__ == '__main__':
 
     sys.path.append(os.path.dirname(os.path.realpath('__file__')))
 
-    from database_utils import connect_to_database, execute_query, CONN_INFO, DATABASE_URL
+    from database_utils import connect_to_database, execute_query, DATABASE_URL
     from etl_utils import nytScraper, execute_insertions_nyt, generate_dates, execute_api_search
 
     # define session constants

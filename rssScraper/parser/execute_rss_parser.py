@@ -11,7 +11,7 @@ if __name__ == '__main__':
     #sys.path.append(root_dir)
 
     from parsing_utils import make_place_filter, parse_feed, execute_insertions
-    from database_utils import connect_to_database, connect_to_heroku_database, execute_query, DATABASE_URL, CONN_INFO
+    from database_utils import connect_to_database, connect_to_heroku_database, execute_query, DATABASE_URL
 
 
     #conn = connect_to_database(CONN_INFO)
