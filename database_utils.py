@@ -25,7 +25,7 @@ def connect_to_heroku_database(conn_url, success_message = True):
 
     conn = psycopg2.connect(conn_url, sslmode = 'require')
     if success_message is True:
-        print("Connected to database %s." % (conn_info['dbname']))
+        print("Connection established.")
 
     return conn
 
