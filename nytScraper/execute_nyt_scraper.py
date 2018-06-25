@@ -3,10 +3,10 @@ import sys
 import json
 
 if __name__ == '__main__':
-    
+
     sys.path.append(os.path.dirname(os.path.realpath('__file__')))
 
-    from database_utils import connect_to_database, execute_query, CONN_INFO
+    from database_utils import connect_to_database, execute_query, CONN_INFO, DATABASE_URL
     from etl_utils import nytScraper, execute_insertions_nyt, generate_dates, execute_api_search
 
     # define session constants
@@ -35,7 +35,8 @@ if __name__ == '__main__':
             reruns.extend(old_reruns)
 
 
-    conn = connect_to_database(CONN_INFO)
+    #conn = connect_to_database(CONN_INFO)
+    conn = connect_to_heroku_database(DATABASE_URL)
 
     q = "SELECT place_name, place_id FROM places WHERE market_id = %s"
     place_list = execute_query(conn, q, data = (MARKET_ID, ), return_values = True)
