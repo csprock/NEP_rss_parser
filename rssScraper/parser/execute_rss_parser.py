@@ -16,9 +16,6 @@ if __name__ == '__main__':
     next_up = os.path.join(os.path.dirname(os.path.realpath(__file__)),'..')
     sys.path.append(next_up)
 
-    #root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)),'..')
-    #sys.path.append(root_dir)
-
     from parsing_utils import make_place_filter, parse_feed, execute_insertions
     from database_utils import connect_to_database, execute_query
 

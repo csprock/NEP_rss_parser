@@ -16,7 +16,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     sys.path.append(os.path.dirname(os.path.realpath('__file__')))
 
-    from database_utils import connect_to_database, execute_query, CONN_INFO
+    from database_utils import connect_to_database, execute_query
     from etl_utils import nytScraper, execute_insertions_nyt, generate_dates, execute_api_search
 
     ########## Setting arguments for session ############
@@ -72,8 +72,6 @@ if __name__ == '__main__':
             old_results, old_reruns = execute_api_search(scraper = apiScraper, place_list = data['place_list'], market_id = MARKET_ID, today = today, yesterday = yesterday)
             results.extend(old_results)
             reruns.extend(old_reruns)
-
-
 
 
     q = "SELECT place_name, place_id FROM places WHERE market_id = %s"

@@ -2,12 +2,12 @@ import os
 import psycopg2
 from psycopg2 import sql
 
-CONN_INFO = {'dbname': os.environ['DB_NAME'],
-            'username':os.environ['DB_USERNAME'],
-            'password':os.environ['DB_PASSWORD'],
-            'host':os.environ['DB_HOST']}
-
-DATABASE_URL = os.environ['DATABASE_URL']
+# CONN_INFO = {'dbname': os.environ['DB_NAME'],
+#             'username':os.environ['DB_USERNAME'],
+#             'password':os.environ['DB_PASSWORD'],
+#             'host':os.environ['DB_HOST']}
+#
+# DATABASE_URL = os.environ['DATABASE_URL']
 
 def connect_to_database(success_message = True, **kwargs):
 
