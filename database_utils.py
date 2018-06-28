@@ -2,32 +2,51 @@ import os
 import psycopg2
 from psycopg2 import sql
 
-#CONN_INFO = {'dbname': os.environ['DB_NAME'],
-#             'username':os.environ['DB_USERNAME'],
-#             'password':os.environ['DB_PASSWORD'],
-#             'host':os.environ['DB_HOST']}
+CONN_INFO = {'dbname': os.environ['DB_NAME'],
+            'username':os.environ['DB_USERNAME'],
+            'password':os.environ['DB_PASSWORD'],
+            'host':os.environ['DB_HOST']}
 
 DATABASE_URL = os.environ['DATABASE_URL']
 
-def connect_to_database(conn_info, success_message = True):
-    conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])
+def connect_to_database(success_message = True, **kwargs):
+
     try:
-        conn = psycopg2.connect(conn_string)
-        if success_message is True:
-            print("Connected to database %s." % (conn_info['dbname']))
+        if 'url' in kwargs:
+            conn = psycopg2.connect(kwargs['url'], sslmode = 'require')
+        else:
+            conn = psycopg2.connect(**kwargs)
+
+        if success_message is True and conn.status == True:
+            print("Connected to database.")
 
         return conn
     except:
-        print('Error! Failure to connect to database %s' % (conn_info['dbname']))
+        print('Error! Failure to connect to database.')
 
-def connect_to_heroku_database(conn_url, success_message = True):
-    #conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])
+#
+#
+# def connect_to_database(conn_info, include_port = False, success_message = True):
+#     if include_port: conn_string = "host='%s' dbname='%s' user='%s' password='%s' port='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'], conn_info['port'])
+#     else: conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])
+#
+#     try:
+#         conn = psycopg2.connect(conn_string)
+#         if success_message is True:
+#             print("Connected to database %s." % (conn_info['dbname']))
+#
+#         return conn
+#     except:
+#         print('Error! Failure to connect to database %s' % (conn_info['dbname']))
 
-    conn = psycopg2.connect(conn_url, sslmode = 'require')
-    if success_message is True:
-        print("Connection established.")
-
-    return conn
+# def connect_to_heroku_database(conn_url, success_message = True):
+#     #conn_string = "host='%s' dbname='%s' user='%s' password='%s'" % (conn_info['host'], conn_info['dbname'], conn_info['username'], conn_info['password'])
+#
+#     conn = psycopg2.connect(conn_url, sslmode = 'require')
+#     if success_message is True:
+#         print("Connection established.")
+#
+#     return conn
 
 
 def execute_query(conn_obj, query, data = None, return_values = False):
