@@ -2,51 +2,27 @@ import os
 import sys
 import argparse
 
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..'))
+
+if __name__ == '__main__': from parsing_utils import make_place_filter, parse_feed, execute_insertions
+else: from .parsing_utils import make_place_filter, parse_feed, execute_insertions
+from database_utils import connect_to_database, execute_query
+
+
 parser = argparse.ArgumentParser()
 
-arg_names = ['--password', '--username', '--host', '--dbname', '--url']
-help_messages = ['Password for postgres database.', 'Username.', 'Host for database', 'Name of database.', 'URL string to database. If specified all other options ignored.']
+arg_names = ['--password', '--user', '--host', '--dbname', '--url']
+help_messages = ['Password for postgres database.', 'user.', 'Host for database', 'Name of database.', 'URL string to database. If specified all other options ignored.']
 for arg, help in zip(arg_names, help_messages):
     parser.add_argument(arg, help = help)
 
-if __name__ == '__main__':
 
-    args = parser.parse_args()
+def execute(**kwargs):
 
-    next_up = os.path.join(os.path.dirname(os.path.realpath(__file__)),'..')
-    sys.path.append(next_up)
-
-    from parsing_utils import make_place_filter, parse_feed, execute_insertions
-    from database_utils import connect_to_database, execute_query
-
-    if args.url:
-        conn = connect_to_database(url = args.url)
+    if 'url' in kwargs:
+        conn = connect_to_database(url = kwargs['url'])
     else:
-        missing_value_message = "Must specify database {} as environment variable {} or as argument."
-        CONN_INFO = dict()
-
-
-        if args.password: password = args.password
-        elif 'DB_PASSWORD' in os.environ: password = os.environ['DB_PASSWORD']
-        else: raise ValueError(missing_value_message.format('password', 'DB_PASSWORD'))
-
-        if args.username: username = args.username
-        elif 'DB_USERNAME' in os.environ: username = os.environ['DB_USERNAME']
-        else: raise ValueError(missing_value_message.format('user', 'DB_USERNAME'))
-
-        if args.host: host = args.host
-        elif 'DB_HOST' in os.environ: host = os.environ['DB_HOST']
-        else: raise ValueError(missing_value_message.format('host','DB_HOST'))
-
-        if args.dbname: dbname = args.dbname
-        elif 'DB_NAME' in os.environ: dbname = os.environ['DB_NAME']
-        else: raise ValueError(missing_Value_message.format('dbname', 'DB_HOST'))
-
-        conn = connect_to_database(dbname = dbname, password = password, host = host, user = username)
-
-    ######################
-    # start main program #
-    ######################
+        conn = connect_to_database(dbname = kwargs['dbname'], password = kwargs['password'], host = kwargs['host'], user = kwargs['user'])
 
     # query string for selecting list of market_id's
     q1 = '''
@@ -82,3 +58,34 @@ if __name__ == '__main__':
         if parsed_results is not None:
             for r in parsed_results:
                 execute_insertions(r, conn)
+
+
+if __name__ == '__main__':
+
+    args = parser.parse_args()
+
+    if args.url:
+        #conn = connect_to_database(url = args.url)
+        execute(url = args.url)
+    else:
+        missing_value_message = "Must specify database {} as environment variable {} or as argument."
+        CONN_INFO = dict()
+
+        if args.password: password = args.password
+        elif 'DB_PASSWORD' in os.environ: password = os.environ['DB_PASSWORD']
+        else: raise ValueError(missing_value_message.format('password', 'DB_PASSWORD'))
+
+        if args.user: user = args.user
+        elif 'DB_user' in os.environ: user = os.environ['DB_user']
+        else: raise ValueError(missing_value_message.format('user', 'DB_user'))
+
+        if args.host: host = args.host
+        elif 'DB_HOST' in os.environ: host = os.environ['DB_HOST']
+        else: raise ValueError(missing_value_message.format('host','DB_HOST'))
+
+        if args.dbname: dbname = args.dbname
+        elif 'DB_NAME' in os.environ: dbname = os.environ['DB_NAME']
+        else: raise ValueError(missing_Value_message.format('dbname', 'DB_HOST'))
+
+        #conn = connect_to_database(dbname = dbname, password = password, host = host, user = user)
+        execute(dbname = dbname, password = password, host = host, user = user)

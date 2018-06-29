@@ -6,6 +6,7 @@ import json
 
 mypath = os.path.dirname(os.path.realpath('__file__'))
 sys.path.append(os.path.join(mypath, os.path.pardir))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nytScraper'))
 
 from database_utils import execute_query
 from database_utils import generate_article_query, generate_tag_query, generate_keyword_query

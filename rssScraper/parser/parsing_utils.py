@@ -12,14 +12,11 @@ with open('english.pickle', 'rb') as file:
 
 import feedparser
 
-
-
 from entityFilter.searchFunctions import returnMatches
 from entityFilter.makeGraphData import makeGraphData
 from entityFilter.SearchGraph import SearchGraph
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'../..'))
-
 
 from database_utils import execute_query
 from database_utils import generate_article_query, generate_tag_query, generate_place_mentions_query
