@@ -14,9 +14,11 @@ parser = argparse.ArgumentParser()
 
 arg_names = ['--password', '--user', '--host', '--dbname', '--url']
 help_messages = ['Password for postgres database.', 'user.', 'Host for database', 'Name of database.', 'URL string to database. If specified all other options ignored.']
+
 for arg, help in zip(arg_names, help_messages):
     parser.add_argument(arg, help = help)
 
+parser.add_argument('--port', type = int, default = 5432)
 
 def execute(**kwargs):
 
@@ -101,4 +103,4 @@ if __name__ == '__main__':
         elif 'DB_NAME' in os.environ: dbname = os.environ['DB_NAME']
         else: raise ValueError(missing_Value_message.format('dbname', 'DB_HOST'))
 
-        execute(dbname = dbname, password = password, host = host, user = user)
+        execute(dbname = dbname, password = password, host = host, user = user, port = args.port)

@@ -1,1 +1,1 @@
-web: python main.py --url $DATABASE_URL
+web: python heroku_main.py
