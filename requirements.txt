@@ -3,3 +3,4 @@ pandas==0.22.0
 feedparser
 requests
 nltk
+beautifulsoup4

@@ -7,16 +7,12 @@ if __name__ == '__main__':
     sys.path.append(os.path.join(mypath, os.pardir))
 
 
-from entityFilter.makeGraphData import makeGraphData
-from entityFilter.SearchGraph import SearchGraph
-
-
-#with open('test_places.txt','r') as r:
-#    test_places = r.read().split('\n')
+from rssScraper.entityFilter.makeGraphData import makeGraphData
+from rssScraper.entityFilter.SearchGraph import SearchGraph
 
 
 test_names_ids = list()
-with open('place_names_and_ids.csv', 'r') as testfile:
+with open('test_data/entity_filter/place_names_and_ids.csv', 'r') as testfile:
     reader = csv.reader(testfile, delimiter = ',')
     for r in reader:
         test_names_ids.append((r[0], int(r[1])))

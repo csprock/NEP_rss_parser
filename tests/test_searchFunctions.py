@@ -7,9 +7,9 @@ if __name__ == '__main__':
     mypath = os.path.dirname(os.path.realpath('__file__'))
     sys.path.append(os.path.join(mypath, os.pardir))
     
-from entityFilter.SearchGraph import SearchGraph
-from entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
-from entityFilter.makeGraphData import makeGraphData
+from rssScraper.entityFilter.SearchGraph import SearchGraph
+from rssScraper.entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
+from rssScraper.entityFilter.makeGraphData import makeGraphData
 
 
 #with open('test_places.txt','r') as r:
@@ -18,17 +18,17 @@ from entityFilter.makeGraphData import makeGraphData
     
 
 test_names_ids = list()
-with open('place_names_and_ids.csv', 'r') as testfile:
+with open('test_data/entity_filter/place_names_and_ids.csv', 'r') as testfile:
     reader = csv.reader(testfile, delimiter = ',')
     for r in reader:
         test_names_ids.append((r[0], int(r[1])))
         
 test_places = [n[0] for n in test_names_ids]
         
-with open('test_string.txt','r') as f:
+with open('test_data/entity_filter/test_string.txt','r') as f:
     test_string = f.read()
     
-with open('empty_string.txt','r') as f:
+with open('test_data/entity_filter/empty_string.txt','r') as f:
     empty_string = f.read()
     
 

@@ -114,7 +114,7 @@ def makeEdgeSet(place_list):
 
 def makeGraphData(place_list):
     """
-    Takes a list of places are returns all the data needed to initialize a SearchGraph object. Function 
+    Takes a list of places are returns all the test_data needed to initialize a SearchGraph object. Function
     requires placeType() and makeEdgeSet() functions. 
     
     Input
@@ -215,7 +215,7 @@ def makeGraphData(place_list):
 #
 #'''
 #    list of places is turned into a list of families by createFamilyList(). Each family is a list of names. 
-#    A list containing a name family is passed to the createFamilyStructure() which converts it to the data 
+#    A list containing a name family is passed to the createFamilyStructure() which converts it to the test_data
 #    structure that is converted to a disambiguate_data() object. The createFilterList() uses both of these
 #    functions to create a list of singletons and disambiguate_data() objects, which is passed on to the 
 #    createFilter function, which creates a filter using the SearchGraph objects.

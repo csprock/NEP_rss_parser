@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from nytScraper.execute_nyt_scraper import execute as nyt_execute
 from rssScraper.parser.execute_rss_parser import execute as rss_execute

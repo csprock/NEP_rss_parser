@@ -71,7 +71,7 @@ def execute_api_query(api_obj, verbose = False, **kwargs):
     Is a wrapper function for the articleAPI.search() function that parses return messages
     and errors. This function takes the articleAPI object and the arguments to be passed to the object.
     The arguments are passed to the articleAPI.search() function and the results of the function parsed.
-    A dictionary containing the information about status messages and the data if the query execution
+    A dictionary containing the information about status messages and the test_data if the query execution
     was successful.
 
     Data returned by the API is processed by the process_results() function and returned as a
@@ -150,7 +150,7 @@ def execute_api_query(api_obj, verbose = False, **kwargs):
             if verbose: print(results['message'])
 
 
-    return {'status':output_status, 'api_status': api_limit, 'data':output_data, 'hits': hits}
+    return {'status':output_status, 'api_status': api_limit, 'test_data':output_data, 'hits': hits}
 
 class nytScraper:
 
@@ -207,7 +207,7 @@ class nytScraper:
 
             if results['status'] == True:
 
-                results_list.extend(results['data'])
+                results_list.extend(results['test_data'])
                 if verbose: print("Status: OK. Current page: " + str(current_page))
                 current_page += 1
 
@@ -325,7 +325,7 @@ def make_keyword_tuples(article_id, data, as_dict = False):
 
 
 def execute_insertions_nyt(conn, data, feed_id, place_id):
-    # connection, data, feed_id (for NYT API), place_id
+    # connection, test_data, feed_id (for NYT API), place_id
 
     article_dict = make_article_tuple(feed_id, data, as_dict = True)
     q_article = generate_article_query(list(article_dict.keys()))
@@ -373,18 +373,18 @@ def execute_api_search(scraper, place_list, market_id, yesterday, today):
 
 
 
-#def _json_bytify(data, ignore_dicts = False):
+#def _json_bytify(test_data, ignore_dicts = False):
 #
-#    if isinstance(data, unicode):
-#        return data.encode('utf-8')
+#    if isinstance(test_data, unicode):
+#        return test_data.encode('utf-8')
 #
-#    if isinstance(data, list):
-#        return [_json_bytify(d, ignore_dicts = True) for d in data]
+#    if isinstance(test_data, list):
+#        return [_json_bytify(d, ignore_dicts = True) for d in test_data]
 #
-#    if isinstance(data, dict) and not ignore_dicts:
-#        return {_json_bytify(k, ignore_dicts = True): _json_bytify(v, ignore_dicts = True) for k, v in data.items()}
+#    if isinstance(test_data, dict) and not ignore_dicts:
+#        return {_json_bytify(k, ignore_dicts = True): _json_bytify(v, ignore_dicts = True) for k, v in test_data.items()}
 #
-#    return data
+#    return test_data
 #
 #def json_load_bytes(f):
 #    return _json_bytify(json.load(f, object_hook = _json_bytify), ignore_dicts = True)
@@ -444,9 +444,9 @@ def execute_api_search(scraper, place_list, market_id, yesterday, today):
 #
 #
 #
-#    def executeInsertion(self, feed_id, place_id, data):
+#    def executeInsertion(self, feed_id, place_id, test_data):
 #
-#        valueTuple1 = make_article_tuple(feed_id, data, as_dict = True)
+#        valueTuple1 = make_article_tuple(feed_id, test_data, as_dict = True)
 #        q1 = self._generateSQL_1(valueTuple1)
 #
 #        with self.CONN as conn:

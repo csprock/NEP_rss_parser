@@ -2,7 +2,7 @@ import re
 from placeFilter import placeFilter
 from SearchGraph import *
 ################################ demonstration of SearchGraph ################################
-# initialize SearchGraph data structure
+# initialize SearchGraph test_data structure
 data_struct = {'root':'Portland', 
                'children': ['South Portland', 'West Portland', 'Portland Heights', 'South Portland Heights', 'South Portland Heights Park', 'West Portland Heights', 'South Portland Heights Grove'],
                'relations': [('Portland', 'South Portland'),
