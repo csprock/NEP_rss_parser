@@ -10,6 +10,7 @@ if __name__ == '__main__':
     sys.path.append(os.path.join(mypath, os.pardir))
 
 from rssScraper.parser.parsing_utils import *
+from database_utils import generate_article_query, generate_tag_query, generate_place_mentions_query
 
 # login credentials to database
 LOGIN_DB = 'csprock'
@@ -20,12 +21,13 @@ TEST_DB = 'test_parsing_utils'
 # location of database initialization scripts
 DATABASE_SCRIPTS = 'test_data'
 
+# load database schema
 with open(os.path.join(DATABASE_SCRIPTS, 'schema1.sql')) as f:
     SCHEMA = f.read()
 
+# load database data
 with open(os.path.join(DATABASE_SCRIPTS, 'data.sql')) as f:
     DATA = f.read()
-
 
 class DatabaseInteractionRequired(unittest.TestCase):
 
@@ -95,7 +97,7 @@ class DatabaseInteractionRequired(unittest.TestCase):
 #             curs.execute("SELECT * FROM feeds")
 #             results = curs.fetchall()
 #             print(results)
-
+@unittest.skip("skipping to isolate test")
 class TestInfoGenerators(DatabaseInteractionRequired):
 
     def setUp(self):
@@ -244,7 +246,7 @@ class TestInfoGenerators(DatabaseInteractionRequired):
         results = get_info(dummy_parsed_entries_summary, 1, self.G)
 
         self.assertDictEqual(expected, results)
-
+@unittest.skip("skipping to isolate test")
 class TestDictionaryMakers(unittest.TestCase):
 
     def setUp(self):
@@ -308,7 +310,7 @@ class TestDictionaryMakers(unittest.TestCase):
         results = make_place_mentions_dict(self.entry_info, tag_id=99, place_id=2)
 
         self.assertListEqual(expected, results)
-
+@unittest.skip("skipping to isolate test")
 class TestExecuteInsertions(DatabaseInteractionRequired):
 
     def setUp(self):
@@ -383,6 +385,76 @@ class TestExecuteInsertions(DatabaseInteractionRequired):
         with self.subTest(msg="Insertion into place_mentions table"):
 
             self.assertListEqual(expected_place_mentions, place_mentions)
+
+
+class TestDuplicateInsertion(DatabaseInteractionRequired):
+
+    def setUp(self):
+
+        self.conn = psycopg2.connect(user=TEST_USER,
+                                     dbname=TEST_DB,
+                                     host=TEST_HOST)
+
+        self.entry_info = {
+            'place_tags': [2, 13],
+            'place_mentions': [
+            {
+                'place_id': 2,
+                'context': 'The first mention of Queens.',
+                'loc': 'summary'
+            },
+            {
+                'place_id': 2,
+                'context': 'The second mention of Queens.',
+                'loc': 'title'
+            },
+            {
+                'place_id': 13,
+                'context': 'The second mention of Coney Island.',
+                'loc': 'summary'
+            }],
+            'articles': {
+                'id': None,
+                'title': 'nothing in the title',
+                'link': 'http://dummyurl_2.com',
+                'summary': 'The first mention of Queens. The second mention of Coney Island.',
+                'date': datetime.datetime(year=2018, month=1, day=1),
+                'feed_id': 1
+            }
+        }
+
+        execute_insertions(self.entry_info, self.conn)
+
+
+    def test_article_insertion(self):
+
+        execute_insertions(self.entry_info, self.conn)
+
+        with self.conn.cursor() as curs:
+            curs.execute("SELECT * FROM articles")
+            results = curs.fetchall()
+
+        self.assertEqual(len(results), 1)
+
+    def test_place_mentions_insertion(self):
+
+        execute_insertions(self.entry_info, self.conn)
+
+        with self.conn.cursor() as curs:
+            curs.execute("SELECT * FROM place_mentions")
+            results = curs.fetchall()
+
+        self.assertEqual(len(results), 3)
+
+    def test_place_tags_insertion(self):
+
+        execute_insertions(self.entry_info, self.conn)
+
+        with self.conn.cursor() as curs:
+            curs.execute("SELECT * FROM place_tags")
+            results = curs.fetchall()
+
+        self.assertEqual(len(results), 2)
 
 
 

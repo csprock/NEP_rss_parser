@@ -213,7 +213,8 @@ def parse_feed(rss_url, feed_id, G):
 
     # TODO: log this, don't throw exception
     if rss_results['bozo'] == 1:
-        #print("WARN " + str(rss_results['bozo_exception']))
+        pass
+        print("WARN " + str(rss_results['bozo_exception']))
         raise ValueError("Connection error: " + str(rss_results['bozo_exception']))
 
     else:
@@ -277,7 +278,7 @@ def execute_insertions(entry, conn):
     article_dict = make_article_dict(entry)
     q_article = generate_article_query(list(article_dict.keys()))
 
-    results = execute_query(conn, q_article, data = article_dict, return_values = True)
+    results = execute_query(conn, q_article, data=article_dict, return_values=True)
     article_id = results[0][1]
 
     tag_dict = make_tag_dict(entry, article_id)
@@ -285,7 +286,7 @@ def execute_insertions(entry, conn):
 
     for tg in tag_dict:
 
-        tag_results = execute_query(conn, q_tag, data = tg, return_values = True)
+        tag_results = execute_query(conn, q_tag, data=tg, return_values=True)
         tag_id = tag_results[0][1]
 
         if tag_results[0][0] == 'inserted':
@@ -296,4 +297,4 @@ def execute_insertions(entry, conn):
             q_mention = generate_place_mentions_query(list(mentions_dict[0].keys()))
 
             for m in mentions_dict:
-                execute_query(conn, q_mention, data = m)
+                execute_query(conn, q_mention, data=m)
