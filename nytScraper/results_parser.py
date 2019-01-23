@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 def process_results(results):
     """
@@ -159,3 +160,70 @@ def format_doc(article):
         document['subsection'] = None
                         
     return document
+
+# the following functions are specific to the database schema and will have
+# to be updated if the database is updated
+
+
+def make_article_tuple(data, feed_id, as_dict = False):
+
+    date_parts = list(map(int, data['date'].split("-")))
+
+
+    if as_dict:
+        output = dict()
+        output['feed_id'] = feed_id
+        output['headline'] = data['headline']
+        output['date'] = datetime.date(date_parts[0], date_parts[1], date_parts[2])
+        output['summary'] = data['snippet']
+        output['content_id'] = data['id']
+        output['url'] = data['url']
+
+        try:
+            output['wordcount'] = int(data['word_count'])
+        except:
+            pass
+
+        try:
+            output['page_number'] = int(data['page'])
+        except:
+            pass
+
+    else:
+        output = (feed_id,
+                    data['id'],
+                    data['headline'],
+                    datetime.date(date_parts[0],date_parts[1],date_parts[2]),
+                    data['snippet'],
+                    data['word_count'],
+                    data['page'],
+                    data['url'])
+
+    return output
+
+
+
+def make_place_tag_tuple(article_id, place_id, as_dict = False):
+
+    if as_dict:
+        output = dict()
+        output['article_id'] = article_id
+        output['place_id'] = place_id
+    else:
+        output = (article_id, place_id)
+
+    return output
+
+
+def make_keyword_tuples(data, article_id, as_dict = False):
+
+    output = list()
+
+    if as_dict:
+        for kw in data['keywords']:
+            output.append(dict(article_id = article_id, tag = kw[0], keyword = kw[1]))
+    else:
+        for kw in data['keywords']:
+            output.append((article_id, kw[0], kw[1]))
+
+    return output

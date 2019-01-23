@@ -3,15 +3,66 @@ import time
 import os
 import sys
 import json
+import logging
 
 mypath = os.path.dirname(os.path.realpath('__file__'))
 sys.path.append(os.path.join(mypath, os.path.pardir))
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nytScraper'))
 
+LOGGER = logging.getLogger(__file__)
+
+log_formatter = logging.Formatter("[%(levelname)s] (%(asctime)s) %(message)s")
+
+stream_handler = logging.StreamHandler()
+LOGGER.setLevel(logging.DEBUG)
+stream_handler.setFormatter(log_formatter)
+
+LOGGER.addHandler(stream_handler)
+
 from database_utils import execute_query
 from database_utils import generate_article_query, generate_tag_query, generate_keyword_query
 from results_parser import process_results
+from results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
 from articleAPI import articleAPI
+
+# Z5nXobB2H0cCDHL74zt88e0kiw5ZrFpt
+
+class APIError(Exception):
+    ''' Generic NYT API exception '''
+
+    def __init__(self, msg=None, *args):
+        if msg is None:
+            msg = "Unknown API error."
+
+        super().__init__(msg, *args)
+
+
+class APILimitRate(APIError):
+    default_msg = '''API Limit Rate Exceeded.'''
+
+    def __init__(self, msg=default_msg, *args):
+        super().__init__(msg, *args)
+
+
+class NoResults(APIError):
+    default_msg = '''No results found.'''
+
+    def __init__(self, msg=default_msg, *args):
+        super().__init__(msg, *args)
+
+
+class InvalidAPIKey(APIError):
+    '''Invalid API keys'''
+
+    def __init__(self, msg, key):
+        super().__init__(msg, key)
+
+
+class AllLimitsReached(APIError):
+    ''' All API keys have reached limits'''
+
+    def __init__(self, msg):
+        super().__init__(msg)
 
 
 class KEYRING:
@@ -22,13 +73,12 @@ class KEYRING:
     Contains accessor methods for updating keys status and for returning the next usable key.
     """
 
-
     def __init__(self, key):
 
         self.KEYS = dict()
 
         if isinstance(key, str):
-            self.Keys[key] = True
+            self.KEYS[key] = True
         elif isinstance(key, list):
             for k in key:
                 assert isinstance(k, str)
@@ -36,17 +86,14 @@ class KEYRING:
         else:
             raise ValueError("KEYRING object must be initialized by a string or list of strings.")
 
-
     def status(self):
         if True in self.KEYS.values():
             return True
         else:
             return False
 
-
     def updateStatus(self, key, val):
         self.KEYS[key] = val
-
 
     def nextKey(self):
         trues = []
@@ -60,137 +107,78 @@ class KEYRING:
             return None
 
 
-#keyring = KEYRING(API_KEYS)
-#
-#keyring.checkKeys()
-#keyring.updateStatus('d7117d6c63404420b03ee92aa4ec9806', False)
+def check_results(results, api_key):
+    '''
+    Check the results of articleAPI.search(), raise exceptions
+    if problems are found. Otherwise returns the results.
 
-def execute_api_query(api_obj, verbose = False, **kwargs):
+    :param results: raw output of articleAPI.search()
+    :return: same as input unless exceptions are raised
+    '''
 
-    """
-    Is a wrapper function for the articleAPI.search() function that parses return messages
-    and errors. This function takes the articleAPI object and the arguments to be passed to the object.
-    The arguments are passed to the articleAPI.search() function and the results of the function parsed.
-    A dictionary containing the information about status messages and the test_data if the query execution
-    was successful.
+    status = results.get('status')
 
-    Data returned by the API is processed by the process_results() function and returned as a
+    # check status
+    if status is not None:
 
-    Performs following checks:
-        - checks the return status of the packet
-        - checks the number of hits
-        - checks if API limit rate has been exceeded
-        - checks if any other error occured
+        if status == 'OK':
+            # check number of hits
+            hits = results['response']['meta']['hits']
 
-    Parameters
-    ----------
-    api_obj: articleAPI search object
-
-
-    kwargs
-    ------
-    query parameters to be passed to the articleAPI.search() function.
-
-
-    Returns
-    -------
-    status: bool
-        returns True when there are results to parse.
-    output_data: list of dict or None
-        list of dict returned by process_results() or None if no results or unsuccessful query
-    api_limit: bool
-        True if API limit rate exceeded
-    hits: int
-        number of returned search hits
-
-    """
-
-    output_status = bool()
-    output_data = None
-    api_limit = False
-    hits = None
-
-    # execute the API query
-    results = api_obj.search(**kwargs)      # returns the result of a requests.get() function
-
-    # parse results of query
-    try:
-
-        status = results['status']
-
-        if status == 'ERROR':
-            output_status = False
-            print("Warning: Error " + results['errors'][0])
-
-        elif status == 'OK':
-
-            hits = int(results['response']['meta']['hits'])
-
-            if hits == 0:
-                output_status = False
-                if verbose: print("No results found.")
-
+            if hits > 0:
+                return results
             else:
-                output_status = True
-                #output_data = results['response']['docs']
-                output_data = process_results(results)
+                raise NoResults
+
+        elif status == 'ERROR':
+
+            error = results.get('errors')
+            raise APIError(error)
+
         else:
-            output_status = False
-            if verbose: print("Error")
+            raise APIError("Unknown Status: {}".format(status))
 
+    else:
 
-    except KeyError:
-        output_status = False
+        fault = results.get('fault')
 
-        # checks for message in the return packet
-        if results['message'] == 'API rate limit exceeded':
-            if verbose: print(results['message'])
-            api_limit = True
+        if fault is not None:
+
+            errorcode = fault['detail']['errorcode']
+
+            if errorcode == 'policies.ratelimit.QuotaViolation':
+                raise APILimitRate
+            elif errorcode == 'oauth.v2.InvalidApiKey':
+                raise InvalidAPIKey(errorcode, api_key)
+            else:
+                raise APIError(errorcode)
+
         else:
-            if verbose: print(results['message'])
+            raise APIError
 
-
-    return {'status':output_status, 'api_status': api_limit, 'test_data':output_data, 'hits': hits}
 
 class nytScraper:
 
     def __init__(self, key):
         self.KEYRING = KEYRING(key)
 
-    def run_query(self, page_range, verbose = False, **kwargs):
+    def run_query(self, start_page=0, stop_page=200, **kwargs):
+        '''
 
-        if isinstance(page_range, list):
-            current_page, stop_page = page_range[0], page_range[1]
-        elif page_range == 'all':
-            current_page, stop_page = 0, 200
-        else:
-            raise ValueError("Must supply list of form [start_page, end_page] or 'all'.")
+        :param start_page: start API results page
+        :param stop_page: end API results page
+        :param kwargs: passed onto articleAPI.search()
+        :return:
+        '''
 
         # initialize variables
         current_key = self.KEYRING.nextKey()             # set current API key to use
         api_obj = articleAPI(current_key)                # initialize articleAPI object using current_key
 
         results_list = list()                            # initialize list where results of queries will be stored
-
-
-        # Check the number of hits and the number of pages needed to download all of them.
-        # If number of pages exceeds maximum allowed by the API (200), returns exception.
-        #kwargs['page']  = current_page
-        results = execute_api_query(api_obj, page = current_page, **kwargs)
-        hits = results['hits']
-
-        if hits == 0 or hits == None:
-            return None
-
-        hits_pages = hits // 10
-
-        if hits_pages > 200:
-            raise ValueError("The number of pages will exceed 200! Number of hits is " + str(hits))
-        else:
-            if verbose: print("Number of results pages: " + str(hits_pages) + " Number of hits: " + str(hits))
-
-
-        while True: # loop runs until stop condition breaks it
+        current_page = start_page
+        i = 0
+        while True:
 
             # patch to fix expanding string bug inside fq and other dictionary kwargs
             # does not effect string kwargs
@@ -201,37 +189,110 @@ class nytScraper:
                             kwargs[k][u] = kwargs[k][u].replace('"', '').strip()
 
 
-            time.sleep(1)
+            time.sleep(7)
 
-            results = execute_api_query(api_obj, page = current_page, **kwargs)
+            results = api_obj.search(page=current_page, **kwargs)
 
-            if results['status'] == True:
+            try:
+                results = check_results(results, current_key)
 
-                results_list.extend(results['test_data'])
-                if verbose: print("Status: OK. Current page: " + str(current_page))
-                current_page += 1
+            # TODO: find out if there is a different errorcode for maximum requests reached
+            except APILimitRate:
+
+                self.KEYRING.updateStatus(current_key, False)
+
+                if self.KEYRING.status():
+                    current_key = self.KEYRING.nextKey()
+                    api_obj = articleAPI(current_key)
+                else:
+                    raise AllLimitsReached
+
+            # except NoResults:
+            #     # TODO: catch this exception in next level up
+            #     raise NoResults
+            #
+            # except InvalidAPIKey as e:
+            #
+            #     errorcode = e.args[0]
+            #     key = e.args[1]
+            #
+            #     self.KEYRING.updateStatus(current_key, False)
+            #
+            #
+            #     # TODO: catch next level up
+            #
+            #     raise InvalidAPIKey(errorcode, key)
+            #
+            # except APIError as e:
+            #     # TODO: catch this exception in next level up
+            #     raise APIError(e.args)
 
             else:
-                # check API status, if API limit reached set status of current key to False and update current key
-                # If all keys have reached their limits, print message and break.
+                try:
+                    hits = results['response']['meta']['hits']
+                    pages = hits // 10
+                    #LOGGER.info("Number of results pages: " + str(pages) + ". Number of hits: " + str(hits))
+                    LOGGER.debug("Page: {}".format(i))
+                    i += 1
 
-                if results['api_status']:
-                    self.KEYRING.updateStatus(current_key, False)
+                    results_list.extend(results['response']['docs'])
+                    current_page += 1
 
-                    # if there is another usable key, set current_key to this key otherwise breaks main loop.
-                    if self.KEYRING.status():
-                        current_key = self.KEYRING.nextKey()
-                        api_obj = articleAPI(current_key)
-
-                    else:
-                        if verbose: print("All API keys have reached their limits.")
-                        break
+                    if current_page > min([pages, stop_page]):
+                        return results_list
+                except Exception as e:
+                    LOGGER.exception(e)
+                    return results
 
 
-            if current_page > min([hits_pages, stop_page]):
-                break
 
-        return results_list
+def execute_api_search(scraper, place_list, market_id, begin_date, end_date):
+
+    all_results, rejects = list(), list()
+    for p in place_list:
+        place_name, place_id = p[0], p[1]
+        time.sleep(1)
+
+        try:
+
+            results = scraper.run_query(begin_date=begin_date,
+                                        end_date=end_date,
+                                        q='"' + place_name + '"',
+                                        fq={'glocations': 'New York City'})
+
+            if results is None:
+                LOGGER.debug("Returned null result set.")
+                raise NoResults
+
+        except NoResults:
+            pass
+        except InvalidAPIKey as e:
+            msg = e.args[0]
+            key = e.args[1]
+
+            LOGGER.critical("{} - {}".format(msg, key))
+            scraper.KEYRING.updateStatus(key, False)
+            # TODO: add current job to queue
+
+        except AllLimitsReached:
+            LOGGER.info("All API keys have reached their limits.")
+            # TODO: add remaining jobs to queue
+            break
+        except APIError as e:
+            LOGGER.error(e.msg[0])
+
+        except json.JSONDecodeError:
+            LOGGER.error("Error decoding response.")
+            # TODO: add current job to queue
+
+        else:
+            # filter out empty results
+            results = list(filter(lambda x: x['query_results'] != None, results))
+            if len(results) > 0:
+                all_results.append(dict(place_id=place_id, query_results=results))
+
+    return results
+
 
 
 def generate_dates():
@@ -255,74 +316,8 @@ def generate_dates():
 
     return _datestr(today), _datestr(yesterday)
 
-###############################################################################
-# the following functions are specific to the database schema and will have
-# to be updated if the database is updated
 
-
-def make_article_tuple(feed_id, data, as_dict = False):
-
-    date_parts = list(map(int, data['date'].split("-")))
-
-
-    if as_dict:
-        output = dict()
-        output['feed_id'] = feed_id
-        output['headline'] = data['headline']
-        output['date'] = datetime.date(date_parts[0], date_parts[1], date_parts[2])
-        output['summary'] = data['snippet']
-        output['content_id'] = data['id']
-        output['url'] = data['url']
-
-        try:
-            output['wordcount'] = int(data['word_count'])
-        except:
-            pass
-
-        try:
-            output['page_number'] = int(data['page'])
-        except:
-            pass
-
-    else:
-        output = (feed_id,
-                    data['id'],
-                    data['headline'],
-                    datetime.date(date_parts[0],date_parts[1],date_parts[2]),
-                    data['snippet'],
-                    data['word_count'],
-                    data['page'],
-                    data['url'])
-
-    return output
-
-
-
-def make_place_tag_tuple(article_id, place_id, as_dict = False):
-
-    if as_dict:
-        output = dict()
-        output['article_id'] = article_id
-        output['place_id'] = place_id
-    else:
-        output = (article_id, place_id)
-
-    return output
-
-
-def make_keyword_tuples(article_id, data, as_dict = False):
-
-    output = list()
-
-    if as_dict:
-        for kw in data['keywords']:
-            output.append(dict(article_id = article_id, tag = kw[0], keyword = kw[1]))
-    else:
-        for kw in data['keywords']:
-            output.append((article_id, kw[0], kw[1]))
-
-    return output
-
+#########################################################################################
 
 def execute_insertions_nyt(conn, data, feed_id, place_id):
     # connection, test_data, feed_id (for NYT API), place_id
@@ -347,29 +342,6 @@ def execute_insertions_nyt(conn, data, feed_id, place_id):
 
 
 
-def execute_api_search(scraper, place_list, market_id, yesterday, today):
-
-    results, rejects = list(), list()
-    for p in place_list:
-        place_name, place_id = p[0], p[1]
-        time.sleep(1)
-
-        try:
-            r = scraper.run_query(page_range = 'all', q = '"' + place_name + '"', fq = {'glocations':'New York City'}, begin_date = yesterday , end_date = today)
-            results.append( dict( place_id = place_id, query_results = r))
-        except json.JSONDecodeError:
-            rejects.append((place_name, place_id))
-
-    # filter out empty results
-    results = list(filter(lambda x: x['query_results'] != None, results))
-    # format rejected queries for JSON storage
-    if len(rejects) > 0:
-        rejects = {'dates':{'yesterday':yesterday, 'today':today},
-                    'place_list':rejects}
-    else:
-        rejects = None
-
-    return results, rejects
 
 
 
