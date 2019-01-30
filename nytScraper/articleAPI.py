@@ -110,4 +110,4 @@ class articleAPI(object):
             API_ROOT, response_format, self._options(**kwargs), key
         )
         r = requests.get(url)
-        return r.json()
+        return r

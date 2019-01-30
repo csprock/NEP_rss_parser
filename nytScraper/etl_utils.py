@@ -5,13 +5,21 @@ import sys
 import json
 import logging
 
+import redis
+
 mypath = os.path.dirname(os.path.realpath('__file__'))
 sys.path.append(os.path.join(mypath, os.path.pardir))
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nytScraper'))
 
-LOGGER = logging.getLogger(__file__)
+from database_utils import execute_query
+from database_utils import generate_article_query, generate_tag_query, generate_keyword_query
+from nytScraper.results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
+from nytScraper.articleAPI import articleAPI
+from nytScraper.results_parser import process_results
 
-log_formatter = logging.Formatter("[%(levelname)s] (%(asctime)s) %(message)s")
+LOGGER = logging.getLogger(__name__)
+
+log_formatter = logging.Formatter("[%(levelname)s] (%(asctime)s) %(message)s %(funcName)s %(module)s")
 
 stream_handler = logging.StreamHandler()
 LOGGER.setLevel(logging.DEBUG)
@@ -19,13 +27,6 @@ stream_handler.setFormatter(log_formatter)
 
 LOGGER.addHandler(stream_handler)
 
-from database_utils import execute_query
-from database_utils import generate_article_query, generate_tag_query, generate_keyword_query
-from results_parser import process_results
-from results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
-from articleAPI import articleAPI
-
-# Z5nXobB2H0cCDHL74zt88e0kiw5ZrFpt
 
 class APIError(Exception):
     ''' Generic NYT API exception '''
@@ -61,17 +62,11 @@ class InvalidAPIKey(APIError):
 class AllLimitsReached(APIError):
     ''' All API keys have reached limits'''
 
-    def __init__(self, msg):
-        super().__init__(msg)
+    def __init__(self, *args):
+        super().__init__(*args)
 
 
 class KEYRING:
-    """
-    Object to be used in getResults().
-
-    Class for storing API keys. Used by getResults() to track which keys have reached their download limits.
-    Contains accessor methods for updating keys status and for returning the next usable key.
-    """
 
     def __init__(self, key):
 
@@ -104,67 +99,87 @@ class KEYRING:
         if len(trues) > 0:
             return list(self.KEYS.keys())[trues[0]]
         else:
-            return None
+            raise AllLimitsReached("All API keys have reached their limits.")
 
 
-def check_results(results, api_key):
+def check_results(r, api_key):
     '''
     Check the results of articleAPI.search(), raise exceptions
     if problems are found. Otherwise returns the results.
 
     :param results: raw output of articleAPI.search()
+    :param api_key: current API key
     :return: same as input unless exceptions are raised
     '''
 
-    status = results.get('status')
+    status_code = r.status_code
+    results = r.json()
 
-    # check status
-    if status is not None:
+    if status_code == 200:
 
-        if status == 'OK':
-            # check number of hits
-            hits = results['response']['meta']['hits']
+        status = results.get('status')
 
-            if hits > 0:
-                return results
+        # check status
+        if status is not None:
+
+            if status == 'OK':
+                # check number of hits
+                hits = results['response']['meta']['hits']
+
+                if hits == 0:
+                    raise NoResults
+
+            elif status == 'ERROR':
+
+                # ['page: must be less than or equal to 200'] is the return for page maxout
+                error = results.get('errors')
+                raise APIError(error[0], status_code)
+
             else:
-                raise NoResults
-
-        elif status == 'ERROR':
-
-            error = results.get('errors')
-            raise APIError(error)
-
+                raise APIError("Unknown Status: {}".format(status))
         else:
-            raise APIError("Unknown Status: {}".format(status))
+            LOGGER.critical("Schema change detected in results['status'].")
+            raise APIError("Unknown API Error.")
+
+    elif status_code == 401:
+
+        errorcode = None
+
+        try:
+            errorcode = results['fault']['detail']['errorcode']
+        except KeyError:
+            LOGGER.critical("Schema change detected in results['fault']['detail']['errorcode']")
+        finally:
+            raise InvalidAPIKey(errorcode, api_key)
+
+    elif status_code == 429:
+
+        errorcode = None
+
+        try:
+            errorcode = results['fault']['detail']['errorcode']
+        except KeyError:
+            LOGGER.critical("Schema change detected in results['fault']['detail']['errorcode']")
+        finally:
+            raise APILimitRate(errorcode)
+
+    elif status_code == 400:
+        LOGGER.debug("400 error")
+        # TODO: find out what the gets returned by this
 
     else:
-
-        fault = results.get('fault')
-
-        if fault is not None:
-
-            errorcode = fault['detail']['errorcode']
-
-            if errorcode == 'policies.ratelimit.QuotaViolation':
-                raise APILimitRate
-            elif errorcode == 'oauth.v2.InvalidApiKey':
-                raise InvalidAPIKey(errorcode, api_key)
-            else:
-                raise APIError(errorcode)
-
-        else:
-            raise APIError
+        raise APIError("Unknown Error, Status Code: {}".format(status_code))
 
 
-class nytScraper:
+class NYTScraper:
 
-    def __init__(self, key):
+    def __init__(self, key, conn=None):
         self.KEYRING = KEYRING(key)
+        self.redis_conn = conn
+        self.current_job = None
 
     def run_query(self, start_page=0, stop_page=200, **kwargs):
         '''
-
         :param start_page: start API results page
         :param stop_page: end API results page
         :param kwargs: passed onto articleAPI.search()
@@ -178,6 +193,7 @@ class nytScraper:
         results_list = list()                            # initialize list where results of queries will be stored
         current_page = start_page
         i = 0
+
         while True:
 
             # patch to fix expanding string bug inside fq and other dictionary kwargs
@@ -188,111 +204,131 @@ class nytScraper:
                         if isinstance(kwargs[k][u], str):
                             kwargs[k][u] = kwargs[k][u].replace('"', '').strip()
 
-
             time.sleep(7)
 
-            results = api_obj.search(page=current_page, **kwargs)
-
             try:
-                results = check_results(results, current_key)
-
-            # TODO: find out if there is a different errorcode for maximum requests reached
-            except APILimitRate:
-
-                self.KEYRING.updateStatus(current_key, False)
-
-                if self.KEYRING.status():
-                    current_key = self.KEYRING.nextKey()
-                    api_obj = articleAPI(current_key)
-                else:
-                    raise AllLimitsReached
-
-            # except NoResults:
-            #     # TODO: catch this exception in next level up
-            #     raise NoResults
-            #
-            # except InvalidAPIKey as e:
-            #
-            #     errorcode = e.args[0]
-            #     key = e.args[1]
-            #
-            #     self.KEYRING.updateStatus(current_key, False)
-            #
-            #
-            #     # TODO: catch next level up
-            #
-            #     raise InvalidAPIKey(errorcode, key)
-            #
-            # except APIError as e:
-            #     # TODO: catch this exception in next level up
-            #     raise APIError(e.args)
-
+                results = api_obj.search(page=current_page, **kwargs)
+            except ConnectionRefusedError as e:
+                LOGGER.warning(e)
+                time.sleep(5)
             else:
                 try:
-                    hits = results['response']['meta']['hits']
-                    pages = hits // 10
-                    #LOGGER.info("Number of results pages: " + str(pages) + ". Number of hits: " + str(hits))
-                    LOGGER.debug("Page: {}".format(i))
-                    i += 1
+                    check_results(results, current_key)
+                    results = results.json()
+                except APILimitRate:
+                    self.KEYRING.updateStatus(current_key, False)
+                    if self.KEYRING.status():
+                        current_key = self.KEYRING.nextKey()
+                        api_obj = articleAPI(current_key)
+                    else:
+                        raise AllLimitsReached("All API keys have reached their limits.")
+                else:
+                    try:
+                        hits = results['response']['meta']['hits']
+                        pages = hits // 10
+                        LOGGER.debug("Page: {}".format(current_page))
 
-                    results_list.extend(results['response']['docs'])
-                    current_page += 1
+                        parsed_results = process_results(results)
+                        results_list.extend(parsed_results)
+                        current_page += 1
 
-                    if current_page > min([pages, stop_page]):
-                        return results_list
-                except Exception as e:
-                    LOGGER.exception(e)
-                    return results
+                        if current_page > min([pages, stop_page]):
+                            return results_list
+                    except Exception as e:
+                        LOGGER.exception(e)
+                        raise
 
+    def execute_api_search(self):
 
+        all_results = list()
 
-def execute_api_search(scraper, place_list, market_id, begin_date, end_date):
+        rem_jobs = 1
 
-    all_results, rejects = list(), list()
-    for p in place_list:
-        place_name, place_id = p[0], p[1]
-        time.sleep(1)
+        while rem_jobs > 0:
+
+            self.current_job = json.loads(self.redis_conn.rpop('queue'))
+            rem_jobs = self.redis_conn.llen('queue')
+
+            time.sleep(1)
+
+            try:
+
+                results = self.run_query(begin_date=self.current_job['begin_date'],
+                                         end_date=self.current_job['end_date'],
+                                         q='"' + self.current_job['place_name'] + '"',
+                                         fq={'glocations': 'New York City'})
+
+                if results is None:
+                    raise NoResults
+
+            except NoResults:
+                LOGGER.debug("Returned null result set.")
+            except InvalidAPIKey as e:
+
+                msg = e.args[0]
+                key = e.args[1]
+
+                LOGGER.critical("Invalid API Key: {} - {}".format(msg, key))
+                self.KEYRING.updateStatus(key, False)
+                LOGGER.debug("Current job: {}".format(self.current_job['place_name']))
+
+                self.return_failed_job()
+
+                # return_failed_job(self.redis_conn,
+                #                   place_id=job['place_id'],
+                #                   place_name=job['place_name'],
+                #                   begin_date=job['begin_date'],
+                #                   end_date=job['end_date'])
+
+            except AllLimitsReached:
+                LOGGER.info("All API keys have reached their limits.")
+                LOGGER.debug("Current job: {}".format(self.current_job['place_name']))
+
+                self.return_failed_job()
+
+                # return_failed_job(self.redis_conn,
+                #                   place_id=job['place_id'],
+                #                   place_name=job['place_name'],
+                #                   begin_date=job['begin_date'],
+                #                   end_date=job['end_date'])
+
+                break
+            except APIError as e:
+                LOGGER.error(e.msg[0])
+
+            except json.JSONDecodeError:
+                LOGGER.error("Error decoding response.")
+                LOGGER.debug("Current job: {}".format(self.current_job['place_name']))
+
+                self.return_failed_job()
+
+                # return_failed_job(self.redis_conn,
+                #                   place_id=job['place_id'],
+                #                   place_name=job['place_name'],
+                #                   begin_date=job['begin_date'],
+                #                   end_date=job['end_date'])
+            else:
+                # filter out empty results
+                results = list(filter(lambda x: x is not None, results))
+                if len(results) > 0:
+                    all_results.append(dict(place_id=self.current_job['place_id'], query_results=results))
+
+            finally:
+
+                if rem_jobs == 0:
+                    LOGGER.debug("Queue empty.")
+
+        return all_results
+
+    def return_failed_job(self):
+
+        payload = json.dumps(self.current_job)
 
         try:
-
-            results = scraper.run_query(begin_date=begin_date,
-                                        end_date=end_date,
-                                        q='"' + place_name + '"',
-                                        fq={'glocations': 'New York City'})
-
-            if results is None:
-                LOGGER.debug("Returned null result set.")
-                raise NoResults
-
-        except NoResults:
-            pass
-        except InvalidAPIKey as e:
-            msg = e.args[0]
-            key = e.args[1]
-
-            LOGGER.critical("{} - {}".format(msg, key))
-            scraper.KEYRING.updateStatus(key, False)
-            # TODO: add current job to queue
-
-        except AllLimitsReached:
-            LOGGER.info("All API keys have reached their limits.")
-            # TODO: add remaining jobs to queue
-            break
-        except APIError as e:
-            LOGGER.error(e.msg[0])
-
-        except json.JSONDecodeError:
-            LOGGER.error("Error decoding response.")
-            # TODO: add current job to queue
-
-        else:
-            # filter out empty results
-            results = list(filter(lambda x: x['query_results'] != None, results))
-            if len(results) > 0:
-                all_results.append(dict(place_id=place_id, query_results=results))
-
-    return results
-
+            self.redis_conn.lpush('queue', payload)
+            LOGGER.debug("Job failed, pushed to redis")
+        except redis.RedisError as e:
+            LOGGER.critical(e)
 
 
 def generate_dates():
@@ -311,131 +347,83 @@ def generate_dates():
         return year + month + day
 
     today = datetime.date.today()
-    dt = datetime.timedelta(days = 1)
+    dt = datetime.timedelta(days=1)
     yesterday = today - dt
 
     return _datestr(today), _datestr(yesterday)
 
 
-#########################################################################################
+def queue_jobs(conn, place_list, begin_date, end_date):
+
+        try:
+            pipe = conn.pipeline()
+            pipe.multi()
+
+            for p in place_list:
+
+                job = {'place_id': p[0],
+                       'place_name': p[1],
+                       'begin_date': begin_date,
+                       'end_date': end_date}
+
+                payload = json.dumps(job)
+                pipe.lpush('queue', payload)
+
+            pipe.execute()
+
+        except redis.RedisError as e:
+            LOGGER.critical(e)
+
+
+# def return_failed_job(conn, place_name, place_id, begin_date, end_date):
+#
+#     job = {'place_id': place_id,
+#            'place_name': place_name,
+#            'begin_date': begin_date,
+#            'end_date': end_date}
+#
+#     payload = json.dumps(job)
+#     try:
+#         conn.lpush('queue', payload)
+#     except redis.RedisError as e:
+#         LOGGER.critical(e)
+
 
 def execute_insertions_nyt(conn, data, feed_id, place_id):
     # connection, test_data, feed_id (for NYT API), place_id
 
-    article_dict = make_article_tuple(feed_id, data, as_dict = True)
+    article_dict = make_article_tuple(feed_id, data, as_dict=True)
     q_article = generate_article_query(list(article_dict.keys()))
 
-    results = execute_query(conn, q_article, data = article_dict, return_values = True)
+    results = execute_query(conn, q_article, data=article_dict, return_values=True)
     article_id = results[0][1]
 
-    tag_dict = make_place_tag_tuple(article_id, place_id, as_dict = True)
+    tag_dict = make_place_tag_tuple(article_id, place_id, as_dict=True)
     q_tag = generate_tag_query(list(tag_dict.keys()))
 
-    execute_query(conn, q_tag, data = tag_dict, return_values = False)
+    execute_query(conn, q_tag, data=tag_dict, return_values=False)
 
-    keyword_dicts = make_keyword_tuples(article_id, data, as_dict = True)
+    keyword_dicts = make_keyword_tuples(article_id, data, as_dict=True)
     if len(keyword_dicts) > 0:
         q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
         for k in keyword_dicts:
-            execute_query(conn, q_keyword, data = k, return_values = False)
+            execute_query(conn, q_keyword, data=k, return_values=False)
 
 
+def insert_results_to_database(conn, all_results, feed_id):
+
+    for place_results in all_results:
+        place_id = place_results['place_id']
+        for query_result in place_results['query_results']:
+            execute_insertions_nyt(conn, query_result, feed_id, place_id)
 
 
+def get_places(conn, market_id):
 
+    QUERY = "SELECT place_id, place_name FROM places WHERE market_id = {}".format(market_id)
 
+    with conn.cursor() as curs:
+        curs.execute(QUERY)
+        results = curs.fetchall()
 
-#def _json_bytify(test_data, ignore_dicts = False):
-#
-#    if isinstance(test_data, unicode):
-#        return test_data.encode('utf-8')
-#
-#    if isinstance(test_data, list):
-#        return [_json_bytify(d, ignore_dicts = True) for d in test_data]
-#
-#    if isinstance(test_data, dict) and not ignore_dicts:
-#        return {_json_bytify(k, ignore_dicts = True): _json_bytify(v, ignore_dicts = True) for k, v in test_data.items()}
-#
-#    return test_data
-#
-#def json_load_bytes(f):
-#    return _json_bytify(json.load(f, object_hook = _json_bytify), ignore_dicts = True)
-#
-
-
-
-#class databaseInserter:
-#
-#
-#
-#    def __init__(self, conn_info):
-#
-#        self.CONN = connect_to_database(conn_info)
-#
-#        self.base_query_1 = '''
-#        WITH input_rows({}) AS (VALUES ({})), ins AS (INSERT INTO {}({})
-#        SELECT * FROM input_rows ON CONFLICT (url) DO NOTHING RETURNING id)
-#        SELECT 'inserted' AS source, id FROM ins UNION ALL
-#        (SELECT 'selected' AS source, {}.id FROM input_rows JOIN {} USING(url))
-#        '''
-#
-#        self.base_query_2 = "INSERT INTO {}({}) VALUES ({})"
-#
-#        self.duplicates = []
-#
-#
-#
-#    def _generateSQL_1(self, values):
-#
-#        f_dict = {k:v for k, v in values.items() if v != None}
-#
-#        field_names = f_dict.keys()
-#
-#        # create SQL variables
-#        table_name = sql.Identifier('articles')
-#        fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
-#        placeholders = sql.SQL(', ').join(map(sql.Placeholder,field_names))
-#
-#        # feed variables to psycopg2's sql statement formatter
-#        q = sql.SQL(self.base_query_1).format(fields, placeholders, table_name, fields, table_name, table_name)
-#        return q
-#
-#
-#    def _generateSQL_2(self, values):
-#
-#        field_names = values.keys()
-#
-#        # create SQL variables
-#        table_name = sql.Identifier('place_mentions')
-#        fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
-#        placeholders = sql.SQL(', ').join(map(sql.Placeholder,field_names))
-#
-#        # feed variables to psycopg2's sql statement formatter
-#        q = sql.SQL(self.base_query_2).format(table_name, fields, placeholders)
-#        return q
-#
-#
-#
-#    def executeInsertion(self, feed_id, place_id, test_data):
-#
-#        valueTuple1 = make_article_tuple(feed_id, test_data, as_dict = True)
-#        q1 = self._generateSQL_1(valueTuple1)
-#
-#        with self.CONN as conn:
-#            with conn.cursor() as curs:
-#                curs.execute(q1, valueTuple1)
-#                returned_id = curs.fetchall()
-#
-#
-#        if returned_id[0][0] == 'selected':
-#            print("Duplicate found at article_id: %s" % str(returned_id[0][1]))
-#            self.duplicates.append((returned_id[0][1], place_id))
-#
-#
-#
-#        valueTuple2 = make_place_tag_tuple(returned_id[0][1], place_id, as_dict = True)
-#        q2 = self._generateSQL_2(valueTuple2)
-#
-#        with self.CONN as conn:
-#            with conn.cursor() as curs:
-#                curs.execute(q2, valueTuple2)
+    return results

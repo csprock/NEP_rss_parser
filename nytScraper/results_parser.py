@@ -165,7 +165,7 @@ def format_doc(article):
 # to be updated if the database is updated
 
 
-def make_article_tuple(data, feed_id, as_dict = False):
+def make_article_tuple(data, feed_id, as_dict=False):
 
     date_parts = list(map(int, data['date'].split("-")))
 
