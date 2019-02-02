@@ -1,13 +1,6 @@
-import os
 import psycopg2
 from psycopg2 import sql
 
-# CONN_INFO = {'dbname': os.environ['DB_NAME'],
-#             'username':os.environ['DB_USERNAME'],
-#             'password':os.environ['DB_PASSWORD'],
-#             'host':os.environ['DB_HOST']}
-#
-# DATABASE_URL = os.environ['DATABASE_URL']
 
 def connect_to_database(success_message = True, **kwargs):
 
@@ -17,7 +10,7 @@ def connect_to_database(success_message = True, **kwargs):
         else:
             conn = psycopg2.connect(**kwargs)
 
-        if success_message is True and conn.status == True:
+        if success_message is True and conn.status is True:
             print("Connected to database.")
 
         return conn
@@ -49,7 +42,7 @@ def connect_to_database(success_message = True, **kwargs):
 #     return conn
 
 
-def execute_query(conn_obj, query, data = None, return_values = False):
+def execute_query(conn_obj, query, data=None, return_values=False):
 
     with conn_obj as conn:
         with conn.cursor() as curs:
@@ -64,7 +57,6 @@ def execute_query(conn_obj, query, data = None, return_values = False):
 
     if return_values:
         return to_return
-
 
 
 def generate_article_query(field_names):
@@ -115,6 +107,7 @@ def generate_tag_query(field_names):
                       table_name, id_name, table_name, conflict_col_1, conflict_col_2)
 
     return q_string
+
 
 def generate_place_mentions_query(field_names):
 

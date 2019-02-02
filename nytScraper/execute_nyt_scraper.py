@@ -2,36 +2,26 @@ import os
 import sys
 import json
 import argparse
+
+import logging
 import redis
 import psycopg2
 from nytScraper.etl_utils import NYTScraper, generate_dates, queue_jobs, execute_insertions_nyt, get_places
 from nytScraper.etl_utils import insert_results_to_database
 
-PG_HOST = os.environ['PG_HOST']
-PG_PASSWORD = os.environ['PG_PASSWORD']
-PG_USER = os.environ['PG_USER']
-PG_DB = os.environ['PG_DB']
-PG_PORT = os.environ['PG_PORT']
+LOGGER = logging.getLogger('execute_nyt_scraper')
 
-REDIS_HOST = os.environ['REDIS_HOST']
-REDIS_DB = 0
-REDIS_PORT = os.environ['REDIS_PORT']
 
-API_KEYS = os.environ['API_KEYS'].split(',')
-MARKET_ID = int(os.environ['NYT_MARKET_ID'])
-FEED_ID = int(os.environ['NYT_FEED_ID'])
+def execute(api_keys, market_id, feed_id, pg_config, redis_config, begin_date=None, end_date=None):
 
-def execute(api_keys, market_id, feed_id, begin_date, end_date, **kwargs):
+    LOGGER.info("Starting NYT scraping cycle.")
 
-    pg_conn = psycopg2.connect(user=kwargs['PG_USER'],
-                               dbname=kwargs['PG_DB'],
-                               password=kwargs['PG_PASSWORD'],
-                               host=kwargs['PG_HOST'],
-                               port=kwargs['PG_PORT'])
+    if begin_date is None or end_date is None:
+        end_date, begin_date = generate_dates()
 
-    redis_conn = redis.Redis(host=kwargs['REDIS_HOST'],
-                             port=kwargs['REDIS_PORT'],
-                             db=kwargs['REDIS_DB'])
+    pg_conn = psycopg2.connect(**pg_config)
+
+    redis_conn = redis.Redis(**redis_config)
 
     place_list = get_places(pg_conn, market_id)
     scraper = NYTScraper(api_keys, conn=redis_conn)
@@ -41,8 +31,6 @@ def execute(api_keys, market_id, feed_id, begin_date, end_date, **kwargs):
     insert_results_to_database(pg_conn, results, feed_id)
 
     pg_conn.close()
-    redis_conn.close()
-
 
 # sys.path.append(os.path.dirname(os.path.realpath('__file__')))
 # print(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nytScraper'))

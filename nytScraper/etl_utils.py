@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import logging
+from requests.exceptions import ConnectionError
 
 import redis
 
@@ -17,15 +18,7 @@ from nytScraper.results_parser import make_article_tuple, make_place_tag_tuple, 
 from nytScraper.articleAPI import articleAPI
 from nytScraper.results_parser import process_results
 
-LOGGER = logging.getLogger(__name__)
-
-log_formatter = logging.Formatter("[%(levelname)s] (%(asctime)s) %(message)s %(funcName)s %(module)s")
-
-stream_handler = logging.StreamHandler()
-LOGGER.setLevel(logging.DEBUG)
-stream_handler.setFormatter(log_formatter)
-
-LOGGER.addHandler(stream_handler)
+LOGGER = logging.getLogger('etl_utils')
 
 
 class APIError(Exception):
@@ -164,7 +157,7 @@ def check_results(r, api_key):
             raise APILimitRate(errorcode)
 
     elif status_code == 400:
-        LOGGER.debug("400 error")
+        LOGGER.info("400 error")
         # TODO: find out what the gets returned by this
 
     else:
@@ -208,7 +201,7 @@ class NYTScraper:
 
             try:
                 results = api_obj.search(page=current_page, **kwargs)
-            except ConnectionRefusedError as e:
+            except ConnectionError as e:
                 LOGGER.warning(e)
                 time.sleep(5)
             else:
@@ -226,7 +219,7 @@ class NYTScraper:
                     try:
                         hits = results['response']['meta']['hits']
                         pages = hits // 10
-                        LOGGER.debug("Page: {}".format(current_page))
+                        LOGGER.info("Page: {}".format(current_page))
 
                         parsed_results = process_results(results)
                         results_list.extend(parsed_results)
@@ -270,7 +263,7 @@ class NYTScraper:
 
                 LOGGER.critical("Invalid API Key: {} - {}".format(msg, key))
                 self.KEYRING.updateStatus(key, False)
-                LOGGER.debug("Current job: {}".format(self.current_job['place_name']))
+                LOGGER.info("Current job: {}".format(self.current_job['place_name']))
 
                 self.return_failed_job()
 
@@ -282,7 +275,7 @@ class NYTScraper:
 
             except AllLimitsReached:
                 LOGGER.info("All API keys have reached their limits.")
-                LOGGER.debug("Current job: {}".format(self.current_job['place_name']))
+                LOGGER.info("Current job: {}".format(self.current_job['place_name']))
 
                 self.return_failed_job()
 
@@ -298,7 +291,7 @@ class NYTScraper:
 
             except json.JSONDecodeError:
                 LOGGER.error("Error decoding response.")
-                LOGGER.debug("Current job: {}".format(self.current_job['place_name']))
+                LOGGER.info("Current job: {}".format(self.current_job['place_name']))
 
                 self.return_failed_job()
 
@@ -307,6 +300,7 @@ class NYTScraper:
                 #                   place_name=job['place_name'],
                 #                   begin_date=job['begin_date'],
                 #                   end_date=job['end_date'])
+
             else:
                 # filter out empty results
                 results = list(filter(lambda x: x is not None, results))
@@ -315,8 +309,10 @@ class NYTScraper:
 
             finally:
 
+                LOGGER.info("Remaining: {}".format(rem_jobs))
+
                 if rem_jobs == 0:
-                    LOGGER.debug("Queue empty.")
+                    LOGGER.info("Queue empty.")
 
         return all_results
 
@@ -326,7 +322,7 @@ class NYTScraper:
 
         try:
             self.redis_conn.lpush('queue', payload)
-            LOGGER.debug("Job failed, pushed to redis")
+            LOGGER.info("Job failed, pushed to redis")
         except redis.RedisError as e:
             LOGGER.critical(e)
 
@@ -392,18 +388,18 @@ def queue_jobs(conn, place_list, begin_date, end_date):
 def execute_insertions_nyt(conn, data, feed_id, place_id):
     # connection, test_data, feed_id (for NYT API), place_id
 
-    article_dict = make_article_tuple(feed_id, data, as_dict=True)
+    article_dict = make_article_tuple(data=data, feed_id=feed_id, as_dict=True)
     q_article = generate_article_query(list(article_dict.keys()))
 
     results = execute_query(conn, q_article, data=article_dict, return_values=True)
     article_id = results[0][1]
 
-    tag_dict = make_place_tag_tuple(article_id, place_id, as_dict=True)
+    tag_dict = make_place_tag_tuple(article_id=article_id, place_id=place_id, as_dict=True)
     q_tag = generate_tag_query(list(tag_dict.keys()))
 
     execute_query(conn, q_tag, data=tag_dict, return_values=False)
 
-    keyword_dicts = make_keyword_tuples(article_id, data, as_dict=True)
+    keyword_dicts = make_keyword_tuples(data=data, article_id=article_id, as_dict=True)
     if len(keyword_dicts) > 0:
         q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
         for k in keyword_dicts:

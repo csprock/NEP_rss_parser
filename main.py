@@ -1,44 +1,111 @@
 import argparse
 import os
+import json
+import psycopg2
+from pytz import timezone
 
+import logging
+import logging.config
+
+with open('logging.json', 'r') as f:
+    logging_config = json.load(f)
+
+logging.config.dictConfig(logging_config)
+LOGGER = logging.getLogger('etl')
+
+from rssScraper.parser.parser import execute_rss_parser
 from nytScraper.execute_nyt_scraper import execute as nyt_execute
-from rssScraper.parser.execute_rss_parser import execute as rss_execute
 
-parser = argparse.ArgumentParser()
+from apscheduler.schedulers.background import BlockingScheduler
+from apscheduler.jobstores.redis import RedisJobStore
+from apscheduler.executors.pool import ThreadPoolExecutor
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
-arg_names = ['--password', '--user', '--host', '--dbname', '--url']
-help_messages = ['Password for postgres database.', 'user.', 'Host for database', 'Name of database.', 'URL string to database. If specified all other options ignored.']
-for arg, help in zip(arg_names, help_messages):
-    parser.add_argument(arg, help = help)
+PG_HOST = os.environ['PG_HOST']
+PG_PASSWORD = os.environ['PG_PASSWORD']
+PG_USER = os.environ['PG_USER']
+PG_DB = os.environ['PG_DB']
+PG_PORT = os.environ['PG_PORT']
 
-args = parser.parse_args()
+REDIS_HOST = os.environ.get('REDIS_HOST', None)
+REDIS_DB_NYT = os.environ['REDIS_DB_NYT']
+REDIS_DB_SCHEDULER = os.environ['REDIS_DB_SCHEDULER']
+REDIS_PORT = os.environ['REDIS_PORT']
 
-if args.url:
-    print("Starting RSS parser....")
-    rss_execute(url = args.url)
-    print("Starting NYT API scraper....")
-    nyt_execute(url = args.url)
-else:
-    missing_value_message = "Must specify database {} as environment variable {} or as argument."
-    CONN_INFO = dict()
+API_KEYS = os.environ['API_KEYS'].split(',')
+MARKET_ID = int(os.environ['NYT_MARKET_ID'])
+FEED_ID = int(os.environ['NYT_FEED_ID'])
 
-    if args.password: password = args.password
-    elif 'DB_PASSWORD' in os.environ: password = os.environ['DB_PASSWORD']
-    else: raise ValueError(missing_value_message.format('password', 'DB_PASSWORD'))
+PG_CONFIG = {
+    'user': PG_USER,
+    'dbname': PG_DB,
+    'port': PG_PORT,
+    'host': PG_HOST,
+    'password': PG_PASSWORD
+}
 
-    if args.user: user = args.user
-    elif 'DB_user' in os.environ: user = os.environ['DB_user']
-    else: raise ValueError(missing_value_message.format('user', 'DB_user'))
+REDIS_CONFIG = {
+    'port': REDIS_PORT,
+    'db': REDIS_DB_NYT,
+    'host': REDIS_HOST
+}
 
-    if args.host: host = args.host
-    elif 'DB_HOST' in os.environ: host = os.environ['DB_HOST']
-    else: raise ValueError(missing_value_message.format('host','DB_HOST'))
+jobstores = {
+    'default': RedisJobStore(db=REDIS_DB_SCHEDULER)
+}
+executors = {
+    'default': ThreadPoolExecutor(max_workers=1)
+}
+job_defaults = {
+    'max_instances': 1
+}
 
-    if args.dbname: dbname = args.dbname
-    elif 'DB_NAME' in os.environ: dbname = os.environ['DB_NAME']
-    else: raise ValueError(missing_Value_message.format('dbname', 'DB_HOST'))
+scheduler = BlockingScheduler(jobstores=jobstores,
+                                executors=executors,
+                                job_defaults=job_defaults)
 
-    print("Starting RSS parser....")
-    rss_execute(dbname = dbname, user = user, password = password, host = host)
-    print("Starting NYT API scraper....")
-    nyt_execute(dbname = dbname, user = user, password = password, host = host)
+
+rss_trigger = IntervalTrigger(hours=4)
+# nyt_test_trigger = IntervalTrigger(minutes=1)
+
+nyt_trigger = CronTrigger(month='*',
+                          day='*',
+                          week='*',
+                          day_of_week='*',
+                          hour='0',
+                          minute='0',
+                          second='0',
+                          timezone=timezone('US/Eastern'))
+
+scheduler.add_job(execute_rss_parser,
+                  id='rss',
+                  trigger=rss_trigger,
+                  max_instances=1,
+                  executor='default',
+                  kwargs={'pg_config': PG_CONFIG})
+
+# nyt_test_trigger = CronTrigger(month='*',
+#                           day='*',
+#                           week='*',
+#                           day_of_week='*',
+#                           hour='20',
+#                           minute='18',
+#                           second='0',
+#                           timezone=timezone('US/Central'))
+
+scheduler.add_job(nyt_execute,
+                  trigger=nyt_trigger,
+                  id='nyt',
+                  executor='default',
+                  max_instances=1,
+                  kwargs={'pg_config': PG_CONFIG,
+                          'redis_config': REDIS_CONFIG,
+                          'api_keys': API_KEYS,
+                          'market_id': MARKET_ID,
+                          'feed_id': FEED_ID})
+
+
+if __name__ == '__main__':
+    LOGGER.info("Starting scheduler.")
+    scheduler.start()

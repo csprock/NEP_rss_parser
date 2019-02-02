@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from datetime import date
 
 def process_results(results):
     """
@@ -75,14 +76,11 @@ def format_doc(article):
     document['url'] = article['web_url']
     document['date'] = article['pub_date'].split("T")[0]    # extract date part from date/time stamp
 
-
-    
     try:
         document['keywords'] = _extract_keywords(article['keywords'])
     except:
         document['keywords'] = None
         
-    
     # headline
     try:
         document['headline'] = article['headline']['main']
@@ -90,11 +88,14 @@ def format_doc(article):
         document['headline'] = None
     
     # material
-    try:
+
+    if 'type_of_material' in article.keys():
         document['material'] = article['type_of_material']
-    except KeyError:
+    elif 'material' in article.keys():
+        document['material'] = article['material']
+    else:
         document['material'] = None
-        
+
     # source
     try:
         document['source'] = article['source']
@@ -174,7 +175,7 @@ def make_article_tuple(data, feed_id, as_dict=False):
         output = dict()
         output['feed_id'] = feed_id
         output['headline'] = data['headline']
-        output['date'] = datetime.date(date_parts[0], date_parts[1], date_parts[2])
+        output['date'] = date(date_parts[0], date_parts[1], date_parts[2])
         output['summary'] = data['snippet']
         output['content_id'] = data['id']
         output['url'] = data['url']
@@ -193,7 +194,7 @@ def make_article_tuple(data, feed_id, as_dict=False):
         output = (feed_id,
                     data['id'],
                     data['headline'],
-                    datetime.date(date_parts[0],date_parts[1],date_parts[2]),
+                    date(date_parts[0],date_parts[1],date_parts[2]),
                     data['snippet'],
                     data['word_count'],
                     data['page'],
