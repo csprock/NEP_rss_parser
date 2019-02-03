@@ -7,9 +7,9 @@ if __name__ == '__main__':
     mypath = os.path.dirname(os.path.realpath('__file__'))
     sys.path.append(os.path.join(mypath, os.pardir))
     
-from rssScraper.entityFilter.SearchGraph import SearchGraph
-from rssScraper.entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
-from rssScraper.entityFilter.makeGraphData import makeGraphData
+from rss_scraper.entityFilter.SearchGraph import SearchGraph
+from rss_scraper.entityFilter.searchFunctions import CountMatches, NetMatches, returnMatches
+from rss_scraper.entityFilter.makeGraphData import makeGraphData
 
 
 #with open('test_places.txt','r') as r:

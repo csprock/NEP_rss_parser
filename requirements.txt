@@ -1,6 +1,0 @@
-psycopg2==2.7.4
-pandas==0.22.0
-feedparser
-requests
-nltk
-beautifulsoup4

@@ -9,9 +9,9 @@ if __name__ == '__main__':
     mypath = os.path.dirname(os.path.realpath('__file__'))
     sys.path.append(os.path.join(mypath, os.pardir))
 
-from rssScraper.parser.parsing_utils import *
-from database_utils import generate_article_query, generate_tag_query, generate_place_mentions_query
+from rss_scraper.parser.parsing_utils import *
 
+# TODO: make these environment variables
 # login credentials to database
 LOGIN_DB = 'csprock'
 TEST_USER = 'csprock'
@@ -22,7 +22,7 @@ TEST_DB = 'test_parsing_utils'
 DATABASE_SCRIPTS = 'test_data'
 
 # load database schema
-with open(os.path.join(DATABASE_SCRIPTS, 'schema1.sql')) as f:
+with open(os.path.join(DATABASE_SCRIPTS, 'schema.sql')) as f:
     SCHEMA = f.read()
 
 # load database data

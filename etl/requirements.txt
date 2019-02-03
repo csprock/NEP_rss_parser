@@ -1,0 +1,5 @@
+psycopg2==2.7.4
+redis==2.10.6
+feedparser==5.2.1
+beautifulsoup4==4.6.3
+apscheduler==3.5.3

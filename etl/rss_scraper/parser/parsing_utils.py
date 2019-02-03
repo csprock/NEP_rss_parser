@@ -1,25 +1,23 @@
 import datetime
-import re
 import os
 import sys
 import pickle
 from bs4 import BeautifulSoup as bs
+import logging
 
-#from nltk.tokenize import sent_tokenize
+LOGGER = logging.getLogger('etl.parsing_utils')
 
 SENTENCE_PARSER = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'english.pickle')
 
 with open(SENTENCE_PARSER, 'rb') as file:
     sent_tokenize = pickle.load(file)
 
-
 import feedparser
+from rss_scraper.entityFilter.searchFunctions import returnMatches
+from rss_scraper.entityFilter.makeGraphData import makeGraphData
+from rss_scraper.entityFilter.SearchGraph import SearchGraph
 
-from rssScraper.entityFilter.searchFunctions import returnMatches
-from rssScraper.entityFilter.makeGraphData import makeGraphData
-from rssScraper.entityFilter.SearchGraph import SearchGraph
-
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),'../..'))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../..'))
 
 from database_utils import execute_query
 from database_utils import generate_article_query, generate_tag_query, generate_place_mentions_query
@@ -72,15 +70,44 @@ def parse_entry(rss_entry):
 
     return parsed_results
 
-def parse_entries(rss_entries):
 
-    parsed_entries = list()
-    for entry in rss_entries:
-        parsed_entries.append(parse_entry(entry))
+# def parse_entries(rss_entries):
+#
+#     parsed_entries = list()
+#     for entry in rss_entries:
+#         parsed_entries.append(parse_entry(entry))
+#
+#     return parsed_entries
 
-    return parsed_entries
 
+def parse_feed(rss_url, feed_id, G):
+
+    parsed_results = list()
+    rss_results = feedparser.parse(rss_url)
+
+
+    if rss_results['bozo'] == 1:
+        LOGGER.warning(str(rss_results['bozo_exception']))
+
+    else:
+
+        for entry in rss_results.entries:
+
+            try:
+                parsed_entry = parse_entry(entry)
+                entry_info = get_info(parsed_entry, feed_id, G)
+
+                if entry_info is not None:
+                    parsed_results.append(entry_info)
+
+            except Exception as e:
+                LOGGER.critical(str(e), exec_info=e)
+
+    return parsed_results
+
+######################################################################
 ##### Functions that generate information for database insertion #####
+######################################################################
 
 def generate_place_mention_info(parsed_result, G):
     '''
@@ -110,7 +137,6 @@ def generate_place_mention_info(parsed_result, G):
             title_place_mentions_info.append({'place_id': i,
                                               'context': parsed_result['title'],
                                               'loc': 'title'})
-
 
     summary_sentences = sent_tokenize.tokenize(parsed_result['summary'])
     summary_place_mentions_tuples = list()
@@ -207,34 +233,20 @@ def get_info(parsed_result, feed_id, G):
         return None
 
 
-def parse_feed(rss_url, feed_id, G):
-
-    rss_results = feedparser.parse(rss_url)
-
-    # TODO: log this, don't throw exception
-    if rss_results['bozo'] == 1:
-        pass
-        print("WARN " + str(rss_results['bozo_exception']))
-        raise ValueError("Connection error: " + str(rss_results['bozo_exception']))
-
-    else:
-        parsed_results = list()
-        for entry in rss_results.entries:
-
-            parsed_entry = get_info(parse_entry(entry), feed_id, G)
-            if parsed_entry is not None:
-                parsed_results.append(parsed_entry)
-
-        return parsed_results
-
-
-##### these functions are database schema dependent #####
+#############################################################
+##### Functions that create tuples from *_info() functions  #
+##### for database insertion.                               #
+#############################################################
 
 def make_article_dict(entry_info):
     '''
     Returns dictionary whose keys match the field names in 'articles' table of database.
     DO NOT CHANGE FIELDS in article_dict
     '''
+
+    if entry_info['articles']['feed_id'] == 3:
+        print("Porland found")
+        print(entry_info)
 
     article_dict = dict()
     article_dict['feed_id'] = entry_info['articles']['feed_id']
@@ -274,6 +286,15 @@ def make_place_mentions_dict(entry_info, tag_id, place_id):
 
 
 def execute_insertions(entry, conn):
+    '''
+
+    Parameters
+    ----------
+    entry: output of parse_entry()
+    conn: postgres connection
+
+    Inserts RSS entry into database
+    '''
 
     article_dict = make_article_dict(entry)
     q_article = generate_article_query(list(article_dict.keys()))

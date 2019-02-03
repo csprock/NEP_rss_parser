@@ -10,15 +10,15 @@ import redis
 
 mypath = os.path.dirname(os.path.realpath('__file__'))
 sys.path.append(os.path.join(mypath, os.path.pardir))
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nytScraper'))
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nyt_scraper'))
 
-from database_utils import execute_query
-from database_utils import generate_article_query, generate_tag_query, generate_keyword_query
-from nytScraper.results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
-from nytScraper.articleAPI import articleAPI
-from nytScraper.results_parser import process_results
+from etl.database_utils import execute_query
+from etl.database_utils import generate_article_query, generate_tag_query, generate_keyword_query
+from nyt_scraper.results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
+from nyt_scraper.articleAPI import articleAPI
+from nyt_scraper.results_parser import process_results
 
-LOGGER = logging.getLogger('etl_utils')
+LOGGER = logging.getLogger('etl.etl_utils')
 
 
 class APIError(Exception):

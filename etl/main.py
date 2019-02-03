@@ -1,10 +1,7 @@
-import argparse
 import os
 import json
-import psycopg2
 from pytz import timezone
 
-import logging
 import logging.config
 
 with open('logging.json', 'r') as f:
@@ -12,9 +9,11 @@ with open('logging.json', 'r') as f:
 
 logging.config.dictConfig(logging_config)
 LOGGER = logging.getLogger('etl')
+APSCHEDULER_LOGGER = logging.getLogger('apscheduler.scheduler')
 
-from rssScraper.parser.parser import execute_rss_parser
-from nytScraper.execute_nyt_scraper import execute as nyt_execute
+from rss_scraper.parser.parser import execute_rss_parser as rss_execute
+from nyt_scraper.execute_nyt_scraper import execute as nyt_execute
+
 
 from apscheduler.schedulers.background import BlockingScheduler
 from apscheduler.jobstores.redis import RedisJobStore
@@ -55,7 +54,7 @@ jobstores = {
     'default': RedisJobStore(db=REDIS_DB_SCHEDULER)
 }
 executors = {
-    'default': ThreadPoolExecutor(max_workers=1)
+    'default': ThreadPoolExecutor(max_workers=2)
 }
 job_defaults = {
     'max_instances': 1
@@ -63,11 +62,30 @@ job_defaults = {
 
 scheduler = BlockingScheduler(jobstores=jobstores,
                                 executors=executors,
-                                job_defaults=job_defaults)
+                                job_defaults=job_defaults,
+                              logging=APSCHEDULER_LOGGER)
 
+####### define triggers ######
 
 rss_trigger = IntervalTrigger(hours=4)
-# nyt_test_trigger = IntervalTrigger(minutes=1)
+
+rss_test_trigger = CronTrigger(month='*',
+                          day='*',
+                          week='*',
+                          day_of_week='*',
+                          hour='16',
+                          minute='41',
+                          second='0',
+                          timezone=timezone('US/Central'))
+
+nyt_test_trigger = CronTrigger(month='*',
+                          day='*',
+                          week='*',
+                          day_of_week='*',
+                          hour='16',
+                          minute='41',
+                          second='0',
+                          timezone=timezone('US/Central'))
 
 nyt_trigger = CronTrigger(month='*',
                           day='*',
@@ -78,24 +96,19 @@ nyt_trigger = CronTrigger(month='*',
                           second='0',
                           timezone=timezone('US/Eastern'))
 
-scheduler.add_job(execute_rss_parser,
+####### add jobs #######
+
+scheduler.add_job(rss_execute,
                   id='rss',
-                  trigger=rss_trigger,
+                  trigger=rss_test_trigger,
                   max_instances=1,
                   executor='default',
                   kwargs={'pg_config': PG_CONFIG})
 
-# nyt_test_trigger = CronTrigger(month='*',
-#                           day='*',
-#                           week='*',
-#                           day_of_week='*',
-#                           hour='20',
-#                           minute='18',
-#                           second='0',
-#                           timezone=timezone('US/Central'))
+
 
 scheduler.add_job(nyt_execute,
-                  trigger=nyt_trigger,
+                  trigger=nyt_test_trigger,
                   id='nyt',
                   executor='default',
                   max_instances=1,

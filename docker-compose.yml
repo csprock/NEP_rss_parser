@@ -1,0 +1,19 @@
+version: "3.0"
+services:
+ content:
+  build: ./content_db
+  env_file:
+   - ./content_db/env
+  environment:
+   - INIT_DB=1
+   - INIT_DATA=1
+  ports:
+   - "6000:5432"
+  expose:
+   - "5432"
+ redis:
+  build: ./redis
+  ports: 
+   - "6379:6379"
+  expose:
+   - "6379"

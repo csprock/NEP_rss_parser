@@ -170,7 +170,6 @@ def make_article_tuple(data, feed_id, as_dict=False):
 
     date_parts = list(map(int, data['date'].split("-")))
 
-
     if as_dict:
         output = dict()
         output['feed_id'] = feed_id
@@ -201,7 +200,6 @@ def make_article_tuple(data, feed_id, as_dict=False):
                     data['url'])
 
     return output
-
 
 
 def make_place_tag_tuple(article_id, place_id, as_dict = False):

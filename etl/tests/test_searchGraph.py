@@ -7,8 +7,8 @@ if __name__ == '__main__':
     sys.path.append(os.path.join(mypath, os.pardir))
 
 
-from rssScraper.entityFilter.makeGraphData import makeGraphData
-from rssScraper.entityFilter.SearchGraph import SearchGraph
+from rss_scraper.entityFilter.makeGraphData import makeGraphData
+from rss_scraper.entityFilter.SearchGraph import SearchGraph
 
 
 test_names_ids = list()

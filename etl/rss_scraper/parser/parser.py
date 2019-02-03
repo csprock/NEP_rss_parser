@@ -1,6 +1,10 @@
+import logging
+import psycopg2
 from queue import Queue
 from threading import Thread
-from rssScraper.parser.parsing_utils import parse_feed, make_place_filter, execute_insertions
+from rss_scraper.parser.parsing_utils import parse_feed, make_place_filter, execute_insertions
+
+LOGGER = logging.getLogger('etl.rss_parser')
 
 FEED_INFO_QUERY = '''
     SELECT market_id, feed_id, url
@@ -13,12 +17,29 @@ FEED_INFO_QUERY = '''
 class RSSWorker(Thread):
 
     def __init__(self, conn, queue_in, queue_out):
-        Thread.__init_added_(self)
+        '''
+
+        Parameters
+        ----------
+        conn: postgres connection
+        queue_in: input job queue
+        queue_out: queue the output is to be stored in
+        '''
+
+        super(RSSWorker, self).__init__()
+
         self.conn = conn
         self.queue_in = queue_in
         self.queue_out = queue_out
 
     def run(self):
+        '''
+        Gets job from the queue (market_id, feed_id and url) and
+        creates a place filter for that market and then executes
+        the RSS parser against that URL.
+        '''
+
+        LOGGER.debug("Starting RSS scraping.")
 
         while True:
 
@@ -26,18 +47,32 @@ class RSSWorker(Thread):
             G = make_place_filter(self.conn, market_id)
             results = parse_feed(url, feed_id, G)
 
-            if results is not None:
+            LOGGER.info("There are {} results for feed {}".format(len(results), feed_id))
+
+            if len(results) > 0:
                 [self.queue_out.put(r) for r in results]
 
             self.queue_in.task_done()
 
 
-def execute_rss_parser(conn):
+def execute_rss_parser(pg_config):
+    '''
+    
+    Parameters
+    ----------
+    conn: postgres connection
+
+    Executes RSS parsing cycle, writes results to postgres database
+    '''
+
+    conn = psycopg2.connect(**pg_config)
 
     # get feeds and market ids
     with conn.cursor() as curs:
         curs.execute(FEED_INFO_QUERY)
         feed_info = curs.fetchall()
+
+    LOGGER.debug("There are {} feeds".format(len(feed_info)))
 
     # create queues
     feed_queue = Queue()
@@ -55,6 +90,7 @@ def execute_rss_parser(conn):
 
     feed_queue.join()
 
+    LOGGER.debug("Parsing finished, inserting into database")
     # insert results into database
     while not db_queue.empty():
         item = db_queue.get()
