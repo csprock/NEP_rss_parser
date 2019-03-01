@@ -7,13 +7,36 @@ services:
   environment:
    - INIT_DB=1
    - INIT_DATA=1
-  ports:
-   - "6000:5432"
   expose:
    - "5432"
+  volumes:
+   - ./.pg_data:/var/lib/postgresql/data
+  networks:
+   - webnet
  redis:
   build: ./redis
-  ports: 
-   - "6379:6379"
   expose:
    - "6379"
+  ports:
+   - "6000:6379"
+  volumes:
+   - ./.redis_data:/data
+  networks:
+   - webnet
+ etl:
+  build: ./etl
+  env_file:
+   - ./etl/env
+  environment:
+   - INIT_REDIS=1
+  command: python main.py --nyt_begin '20181101' --nyt_end '20181231'
+  volumes:
+   - ./logs:/app/logs
+  depends_on:
+    - content
+    - redis
+  networks:
+    - webnet
+
+networks:
+ webnet:
