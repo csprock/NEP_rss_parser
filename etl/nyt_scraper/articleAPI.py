@@ -1,7 +1,11 @@
 import requests
+import logging
 API_ROOT = 'http://api.nytimes.com/svc/search/v2/articlesearch.'
 
 API_SIGNUP_PAGE = 'http://developer.nytimes.com/docs/reference/keys'
+
+LOGGER = logging.getLogger('etl.nyt_scraper.articleAPI')
+
 
 class NoAPIKeyException(Exception):
     def __init__(self, value):
@@ -109,5 +113,7 @@ class articleAPI(object):
         url = '%s%s?%sapi-key=%s' % (
             API_ROOT, response_format, self._options(**kwargs), key
         )
+
+        LOGGER.debug(url)
         r = requests.get(url)
         return r

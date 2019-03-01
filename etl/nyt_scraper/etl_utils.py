@@ -12,8 +12,8 @@ mypath = os.path.dirname(os.path.realpath('__file__'))
 sys.path.append(os.path.join(mypath, os.path.pardir))
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nyt_scraper'))
 
-from etl.database_utils import execute_query
-from etl.database_utils import generate_article_query, generate_tag_query, generate_keyword_query
+from database_utils import execute_query
+from database_utils import generate_article_query, generate_tag_query, generate_keyword_query
 from nyt_scraper.results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
 from nyt_scraper.articleAPI import articleAPI
 from nyt_scraper.results_parser import process_results
@@ -143,7 +143,7 @@ def check_results(r, api_key):
         except KeyError:
             LOGGER.critical("Schema change detected in results['fault']['detail']['errorcode']")
         finally:
-            raise InvalidAPIKey(errorcode, api_key)
+            raise InvalidAPIKey(str(status_code) + errorcode, api_key)
 
     elif status_code == 429:
 
@@ -154,11 +154,10 @@ def check_results(r, api_key):
         except KeyError:
             LOGGER.critical("Schema change detected in results['fault']['detail']['errorcode']")
         finally:
-            raise APILimitRate(errorcode)
+            raise APILimitRate(str(status_code) + errorcode)
 
     elif status_code == 400:
-        LOGGER.info("400 error")
-        # TODO: find out what the gets returned by this
+        raise APIError("400 Error")
 
     else:
         raise APIError("Unknown Error, Status Code: {}".format(status_code))
@@ -208,18 +207,21 @@ class NYTScraper:
                 try:
                     check_results(results, current_key)
                     results = results.json()
+
                 except APILimitRate:
                     self.KEYRING.updateStatus(current_key, False)
                     if self.KEYRING.status():
                         current_key = self.KEYRING.nextKey()
                         api_obj = articleAPI(current_key)
+                        LOGGER.warning("API key reached limit, cycling new key.")
                     else:
                         raise AllLimitsReached("All API keys have reached their limits.")
                 else:
+
                     try:
                         hits = results['response']['meta']['hits']
                         pages = hits // 10
-                        LOGGER.info("Page: {}".format(current_page))
+                        LOGGER.debug("Page: {}".format(current_page))
 
                         parsed_results = process_results(results)
                         results_list.extend(parsed_results)
@@ -274,7 +276,7 @@ class NYTScraper:
                 #                   end_date=job['end_date'])
 
             except AllLimitsReached:
-                LOGGER.info("All API keys have reached their limits.")
+                LOGGER.warning("All API keys have reached their limits.")
                 LOGGER.info("Current job: {}".format(self.current_job['place_name']))
 
                 self.return_failed_job()
@@ -288,6 +290,7 @@ class NYTScraper:
                 break
             except APIError as e:
                 LOGGER.error(e.msg[0])
+                self.return_failed_job()
 
             except json.JSONDecodeError:
                 LOGGER.error("Error decoding response.")
@@ -309,10 +312,10 @@ class NYTScraper:
 
             finally:
 
-                LOGGER.info("Remaining: {}".format(rem_jobs))
+                LOGGER.debug("Remaining: {}".format(rem_jobs))
 
                 if rem_jobs == 0:
-                    LOGGER.info("Queue empty.")
+                    LOGGER.debug("Queue empty.")
 
         return all_results
 

@@ -54,6 +54,10 @@
     "etl.parsing_utils": {
       "propagate": false,
       "handlers": ["console", "rss_prod"]
+    },
+    "etl.nyt_scraper.articleAPI": {
+      "propagate": false,
+      "handlers": ["console"]
     }
   },
   "root": {
