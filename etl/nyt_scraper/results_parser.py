@@ -176,7 +176,7 @@ def make_article_tuple(data, feed_id, as_dict=False):
         output['headline'] = data['headline']
         output['date'] = date(date_parts[0], date_parts[1], date_parts[2])
         output['summary'] = data['snippet']
-        output['content_id'] = data['id']
+        #output['content_id'] = data['id']
         output['url'] = data['url']
 
         try:
@@ -191,10 +191,11 @@ def make_article_tuple(data, feed_id, as_dict=False):
 
     else:
         output = (feed_id,
-                    data['id'],
+                    #data['id'],
                     data['headline'],
                     date(date_parts[0],date_parts[1],date_parts[2]),
                     data['snippet'],
+                    None,
                     data['word_count'],
                     data['page'],
                     data['url'])

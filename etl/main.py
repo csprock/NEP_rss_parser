@@ -119,8 +119,13 @@ REDIS_CONFIG_SCHEDULER = {
 }
 
 if int(os.environ['INIT_REDIS']) == 1:
-    redis_conn = redis.Redis(**REDIS_CONFIG_SCHEDULER)
-    result = redis_conn.delete('apscheduler.jobs')
+
+    redis_conn_apscheduler = redis.Redis(**REDIS_CONFIG_SCHEDULER)
+    _ = redis_conn_apscheduler.delete('apscheduler.jobs')
+
+    redis_conn_queue = redis.Redis(**REDIS_CONFIG_NYT)
+    _ = redis_conn_queue.delete('queue')
+
     LOGGER.info("Previous jobstore overridden.")
 
 
@@ -144,17 +149,17 @@ scheduler = BlockingScheduler(jobstores=jobstores,
 #rss_interval_trigger = IntervalTrigger(hours=RSS_INTERVAL)
 
 nyt_trigger = CronTrigger(**NYT_SCHEDULE_CONFIG)
-rss_trigger = CronTrigger(**RSS_SCHEDULE_CONFIG)
+#rss_trigger = CronTrigger(**RSS_SCHEDULE_CONFIG)
 
 
 ####### add jobs #######
 
-scheduler.add_job(rss_execute,
-                  id='rss',
-                  trigger=rss_trigger,
-                  max_instances=1,
-                  executor='default',
-                  kwargs={'pg_config': PG_CONFIG})
+# scheduler.add_job(rss_execute,
+#                   id='rss',
+#                   trigger=rss_trigger,
+#                   max_instances=1,
+#                   executor='default',
+#                   kwargs={'pg_config': PG_CONFIG})
 
 
 

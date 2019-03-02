@@ -13,7 +13,7 @@ sys.path.append(os.path.join(mypath, os.path.pardir))
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nyt_scraper'))
 
 from database_utils import execute_query
-from database_utils import generate_article_query, generate_tag_query, generate_keyword_query
+from database_utils import generate_article_query, generate_tag_query, generate_keyword_query, generate_place_mentions_query
 from nyt_scraper.results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
 from nyt_scraper.articleAPI import articleAPI
 from nyt_scraper.results_parser import process_results
@@ -243,6 +243,7 @@ class NYTScraper:
 
             self.current_job = json.loads(self.redis_conn.rpop('queue'))
             rem_jobs = self.redis_conn.llen('queue')
+            LOGGER.debug(self.current_job)
 
             time.sleep(1)
 
@@ -398,15 +399,17 @@ def execute_insertions_nyt(conn, data, feed_id, place_id):
     article_id = results[0][1]
 
     tag_dict = make_place_tag_tuple(article_id=article_id, place_id=place_id, as_dict=True)
-    q_tag = generate_tag_query(list(tag_dict.keys()))
+    #q_tag = generate_tag_query(list(tag_dict.keys()))
+
+    q_tag = generate_place_mentions_query(list(tag_dict.keys()))
 
     execute_query(conn, q_tag, data=tag_dict, return_values=False)
-
-    keyword_dicts = make_keyword_tuples(data=data, article_id=article_id, as_dict=True)
-    if len(keyword_dicts) > 0:
-        q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
-        for k in keyword_dicts:
-            execute_query(conn, q_keyword, data=k, return_values=False)
+    # TODO: add these back
+    # keyword_dicts = make_keyword_tuples(data=data, article_id=article_id, as_dict=True)
+    # if len(keyword_dicts) > 0:
+    #     q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
+    #     for k in keyword_dicts:
+    #         execute_query(conn, q_keyword, data=k, return_values=False)
 
 
 def insert_results_to_database(conn, all_results, feed_id):
@@ -419,7 +422,13 @@ def insert_results_to_database(conn, all_results, feed_id):
 
 def get_places(conn, market_id):
 
-    QUERY = "SELECT place_id, place_name FROM places WHERE market_id = {}".format(market_id)
+    #QUERY = "SELECT place_id, place_name FROM places WHERE market_id = {}".format(market_id)
+    QUERY = '''
+    SELECT place_id, place_name 
+    FROM media_markets INNER JOIN places ON media_markets.id = places.market_id 
+    INNER JOIN place_aliases ON places.id = place_aliases.place_id WHERE market_id = {}
+    LIMIT 3;
+    '''.format(market_id)
 
     with conn.cursor() as curs:
         curs.execute(QUERY)

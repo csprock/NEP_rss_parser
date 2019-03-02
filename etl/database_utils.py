@@ -69,7 +69,7 @@ def generate_article_query(field_names):
     '''
 
     table_name = sql.Identifier('articles')
-    id_name = sql.Identifier('article_id')
+    id_name = sql.Identifier('id')   # changed from article_id
     conflict_col = sql.Identifier('url')
 
     fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
@@ -93,8 +93,8 @@ def generate_tag_query(field_names):
     '''
 
 
-    table_name = sql.Identifier('place_tags')
-    id_name = sql.Identifier('tag_id')
+    table_name = sql.Identifier('place_mentions')  # changed from place_tags
+    id_name = sql.Identifier('id')  # changed from tag_id
     conflict_col_1 = sql.Identifier('article_id')
     conflict_col_2 = sql.Identifier('place_id')
 
@@ -115,6 +115,7 @@ def generate_place_mentions_query(field_names):
     INSERT INTO {}({}) VALUES ({})
     '''
 
+    #table_name = sql.Identifier('place_mentions')
     table_name = sql.Identifier('place_mentions')
 
     fields = sql.SQL(', ').join(map(sql.Identifier, field_names))
