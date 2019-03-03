@@ -400,7 +400,6 @@ def execute_insertions_nyt(conn, data, feed_id, place_id):
 
     tag_dict = make_place_tag_tuple(article_id=article_id, place_id=place_id, as_dict=True)
     #q_tag = generate_tag_query(list(tag_dict.keys()))
-
     q_tag = generate_place_mentions_query(list(tag_dict.keys()))
 
     execute_query(conn, q_tag, data=tag_dict, return_values=False)
@@ -411,13 +410,37 @@ def execute_insertions_nyt(conn, data, feed_id, place_id):
     #     for k in keyword_dicts:
     #         execute_query(conn, q_keyword, data=k, return_values=False)
 
+def remove_duplicates(alist):
+
+    de_duped = list()
+
+    for item in alist:
+        if item not in de_duped:
+            de_duped.append(item)
+
+    return de_duped
+
 
 def insert_results_to_database(conn, all_results, feed_id):
 
+    flattened_results = list()
     for place_results in all_results:
         place_id = place_results['place_id']
         for query_result in place_results['query_results']:
-            execute_insertions_nyt(conn, query_result, feed_id, place_id)
+            flattened_results.append((place_id, query_result))
+
+    flattened_results = remove_duplicates(flattened_results)
+
+    for result in flattened_results:
+        place_id = result[0]
+        query_result = result[1]
+        execute_insertions_nyt(conn, query_result, feed_id, place_id)
+
+
+    # for place_results in all_results:
+    #     place_id = place_results['place_id']
+    #     for query_result in place_results['query_results']:
+    #         execute_insertions_nyt(conn, query_result, feed_id, place_id)
 
 
 def get_places(conn, market_id):
