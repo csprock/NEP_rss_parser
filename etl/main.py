@@ -12,7 +12,6 @@ args = parser.parse_args()
 NYT_BEGIN = args.nyt_begin
 NYT_END = args.nyt_end
 
-
 import logging.config
 
 with open('logging.json', 'r') as f:
@@ -123,10 +122,13 @@ if int(os.environ['INIT_REDIS']) == 1:
     redis_conn_apscheduler = redis.Redis(**REDIS_CONFIG_SCHEDULER)
     _ = redis_conn_apscheduler.delete('apscheduler.jobs')
 
+    LOGGER.info("Previous jobstore overridden.")
+
     redis_conn_queue = redis.Redis(**REDIS_CONFIG_NYT)
     _ = redis_conn_queue.delete('queue')
 
-    LOGGER.info("Previous jobstore overridden.")
+    LOGGER.info("Previous queue overridden.")
+
 
 
 jobstores = {

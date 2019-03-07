@@ -20,6 +20,7 @@ from nyt_scraper.results_parser import process_results
 
 LOGGER = logging.getLogger('etl.etl_utils')
 
+REQUEST_INTERVAL = float(os.environ['NYT_API_REQUEST_INTERVAL'])
 
 class APIError(Exception):
     ''' Generic NYT API exception '''
@@ -196,7 +197,7 @@ class NYTScraper:
                         if isinstance(kwargs[k][u], str):
                             kwargs[k][u] = kwargs[k][u].replace('"', '').strip()
 
-            time.sleep(7)
+            time.sleep(REQUEST_INTERVAL)
 
             try:
                 results = api_obj.search(page=current_page, **kwargs)
@@ -290,7 +291,7 @@ class NYTScraper:
 
                 break
             except APIError as e:
-                LOGGER.error(e.msg[0])
+                LOGGER.error(e.args[0])
                 self.return_failed_job()
 
             except json.JSONDecodeError:
@@ -403,12 +404,13 @@ def execute_insertions_nyt(conn, data, feed_id, place_id):
     q_tag = generate_place_mentions_query(list(tag_dict.keys()))
 
     execute_query(conn, q_tag, data=tag_dict, return_values=False)
-    # TODO: add these back
-    # keyword_dicts = make_keyword_tuples(data=data, article_id=article_id, as_dict=True)
-    # if len(keyword_dicts) > 0:
-    #     q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
-    #     for k in keyword_dicts:
-    #         execute_query(conn, q_keyword, data=k, return_values=False)
+
+    keyword_dicts = make_keyword_tuples(data=data, article_id=article_id, as_dict=True)
+    if len(keyword_dicts) > 0:
+        q_keyword = generate_keyword_query(list(keyword_dicts[0].keys()))
+        for k in keyword_dicts:
+            execute_query(conn, q_keyword, data=k, return_values=False)
+
 
 def remove_duplicates(alist):
 
