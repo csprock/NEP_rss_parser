@@ -16,7 +16,12 @@ def execute(api_keys, market_id, feed_id, pg_config, redis_config, begin_date=No
 
     pg_conn = psycopg2.connect(**pg_config)
 
-    redis_conn = redis.Redis(**redis_config)
+    if isinstance(redis_config, dict):
+        redis_conn = redis.Redis(**redis_config)
+    elif isinstance(redis_config, str) and len(redis_config) > 0:
+        redis_conn = redis.Redis.from_url(redis_config)
+    else:
+        raise ValueError("redis_config must be either dict or str")
 
     place_list = get_places(pg_conn, market_id)
     scraper = NYTScraper(api_keys, conn=redis_conn)

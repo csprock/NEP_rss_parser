@@ -3,6 +3,7 @@ import json
 from pytz import timezone
 import redis
 import argparse
+from urllib.parse import urlparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--nyt_begin', type=str, default=None)
@@ -40,19 +41,32 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 # Postgres credentials
-PG_HOST = os.environ['PGHOST']
-PG_PASSWORD = os.environ['PGPASSWORD']
-PG_USER = os.environ['PGUSER']
-PG_DB = os.environ['PGDATABASE']
-PG_PORT = os.environ['PGPORT']
+PG_HOST = os.getenv('PGHOST')
+PG_PASSWORD = os.getenv('PGPASSWORD')
+PG_USER = os.getenv('PGUSER')
+PG_DB = os.getenv('PGDATABASE')
+PG_PORT = os.getenv('PGPORT')
+
+PG_URI = os.getenv('PG_URI')
+
+if PG_URI:
+    parsed_url = urlparse(PG_URI)
+    PG_HOST = parsed_url.hostname
+    PG_PASSWORD = parsed_url.password
+    PG_USER = parsed_url.username
+    PG_PORT = parsed_url.port
+    PG_DB = parsed_url.path[1:]
+
 
 # redis credentials
-REDIS_HOST = os.environ.get('REDIS_HOST', None)
-REDIS_DB_NYT = os.environ['REDIS_DB_NYT']
-REDIS_DB_SCHEDULER = os.environ['REDIS_DB_SCHEDULER']
-REDIS_PORT = os.environ['REDIS_PORT']
+REDIS_HOST = os.getenv('REDIS_HOST')
+REDIS_DB_NYT = os.getenv('REDIS_DB_NYT')
+REDIS_DB_SCHEDULER = os.getenv('REDIS_DB_SCHEDULER')
+REDIS_PORT = os.getenv('REDIS_PORT')
 
-INIT_REDIS = os.environ['INIT_REDIS']
+REDIS_URI = os.getenv('REDIS_URI')
+
+INIT_REDIS = int(os.environ['INIT_REDIS'])
 
 # API keys
 API_KEYS = os.environ['API_KEYS'].split(',')
@@ -113,29 +127,36 @@ PG_CONFIG = {
     'password': PG_PASSWORD
 }
 
-REDIS_CONFIG_NYT = {
-    'port': REDIS_PORT,
-    'db': REDIS_DB_NYT,
-    'host': REDIS_HOST
-}
+if PG_URI:
+    REDIS_CONFIG_NYT = REDIS_URI
+else:
+    REDIS_CONFIG_NYT = {
+        'port': REDIS_PORT,
+        'db': REDIS_DB_NYT,
+        'host': REDIS_HOST
+    }
 
-REDIS_CONFIG_SCHEDULER = {
-    'port': REDIS_PORT,
-    'db': REDIS_DB_SCHEDULER,
-    'host': REDIS_HOST
-}
+# REDIS_CONFIG_SCHEDULER = {
+#     'port': REDIS_PORT,
+#     'db': REDIS_DB_SCHEDULER,
+#     'host': REDIS_HOST
+# }
 
-if int(os.environ['INIT_REDIS']) == 1:
+if INIT_REDIS == 1:
 
-    redis_conn_apscheduler = redis.Redis(**REDIS_CONFIG_SCHEDULER)
-    _ = redis_conn_apscheduler.delete('apscheduler.jobs')
+    #redis_conn_apscheduler = redis.Redis(**REDIS_CONFIG_SCHEDULER)
+    #_ = redis_conn_apscheduler.delete('apscheduler.jobs')
 
-    LOGGER.info("Previous jobstore overridden.")
+    # LOGGER.info("Previous jobstore overridden.")
+    try:
+        redis_conn_queue = redis.Redis(**REDIS_CONFIG_NYT)
+    except TypeError:
+        redis_conn_queue = redis.Redis.from_url(REDIS_URI)
+        
+    flush_status = redis_conn_queue.flushdb()
+    #_ = redis_conn_queue.delete('queue')
 
-    redis_conn_queue = redis.Redis(**REDIS_CONFIG_NYT)
-    _ = redis_conn_queue.delete('queue')
-
-    LOGGER.info("Previous queue overridden.")
+    LOGGER.info("Flush status: {}.".format(flush_status))
 
 
 #
