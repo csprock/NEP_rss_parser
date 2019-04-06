@@ -71,15 +71,15 @@ NYT_SECOND = os.environ['NYT_SECOND']
 
 # RSS job config
 
-RSS_DAY = os.environ.get('RSS_DAY')
-RSS_MONTH = os.environ.get('RSS_MONTH')
-RSS_WEEK = os.environ.get('RSS_WEEK')
-RSS_DAY_OF_WEEK = os.environ.get('RSS_DAY_OF_WEEK')
-RSS_HOUR = os.environ.get('RSS_HOUR')
-RSS_MINUTE = os.environ['RSS_MINUTE']
-RSS_SECOND = os.environ['RSS_SECOND']
-
-RSS_INTERVAL = os.environ['RSS_INTERVAL']
+# RSS_DAY = os.environ.get('RSS_DAY')
+# RSS_MONTH = os.environ.get('RSS_MONTH')
+# RSS_WEEK = os.environ.get('RSS_WEEK')
+# RSS_DAY_OF_WEEK = os.environ.get('RSS_DAY_OF_WEEK')
+# RSS_HOUR = os.environ.get('RSS_HOUR')
+# RSS_MINUTE = os.environ['RSS_MINUTE']
+# RSS_SECOND = os.environ['RSS_SECOND']
+#
+# RSS_INTERVAL = os.environ['RSS_INTERVAL']
 
 NYT_SCHEDULE_CONFIG = {
     'month': NYT_MONTH,
@@ -93,16 +93,16 @@ NYT_SCHEDULE_CONFIG = {
 }
 
 
-RSS_SCHEDULE_CONFIG = {
-    'month': RSS_MONTH,
-    'day': RSS_DAY,
-    'week': RSS_WEEK,
-    'day_of_week': RSS_DAY_OF_WEEK,
-    'hour': RSS_HOUR,
-    'minute': RSS_MINUTE,
-    'second': RSS_SECOND,
-    'timezone': timezone('US/Eastern')
-}
+# RSS_SCHEDULE_CONFIG = {
+#     'month': RSS_MONTH,
+#     'day': RSS_DAY,
+#     'week': RSS_WEEK,
+#     'day_of_week': RSS_DAY_OF_WEEK,
+#     'hour': RSS_HOUR,
+#     'minute': RSS_MINUTE,
+#     'second': RSS_SECOND,
+#     'timezone': timezone('US/Eastern')
+# }
 
 
 PG_CONFIG = {
@@ -173,21 +173,29 @@ nyt_trigger = CronTrigger(**NYT_SCHEDULE_CONFIG)
 
 
 
-scheduler.add_job(nyt_execute,
-                  trigger=nyt_trigger,
-                  id='nyt',
-                  executor='default',
-                  max_instances=1,
-                  kwargs={'pg_config': PG_CONFIG,
-                          'redis_config': REDIS_CONFIG_NYT,
-                          'api_keys': API_KEYS,
-                          'market_id': MARKET_ID,
-                          'feed_id': FEED_ID,
-                          'begin_date': NYT_BEGIN,
-                          'end_date': NYT_END})
+# scheduler.add_job(nyt_execute,
+#                   trigger=nyt_trigger,
+#                   id='nyt',
+#                   executor='default',
+#                   max_instances=1,
+#                   kwargs={'pg_config': PG_CONFIG,
+#                           'redis_config': REDIS_CONFIG_NYT,
+#                           'api_keys': API_KEYS,
+#                           'market_id': MARKET_ID,
+#                           'feed_id': FEED_ID,
+#                           'begin_date': NYT_BEGIN,
+#                           'end_date': NYT_END})
 
+
+KWARGS = {'pg_config': PG_CONFIG,
+          'redis_config': REDIS_CONFIG_NYT,
+          'api_keys': API_KEYS,
+          'market_id': MARKET_ID,
+          'feed_id': FEED_ID,
+           'begin_date': NYT_BEGIN,
+           'end_date': NYT_END}
 
 if __name__ == '__main__':
-
-    LOGGER.info("Starting scheduler.")
-    scheduler.start()
+    LOGGER.info("Starting scraper.")
+    nyt_execute(**KWARGS)
+    LOGGER.info("Finished.")
