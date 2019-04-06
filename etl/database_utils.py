@@ -59,6 +59,26 @@ def execute_query(conn_obj, query, data=None, return_values=False):
         return to_return
 
 
+
+def execute_query2(conn_obj, query, data=None, return_values=False):
+
+    cursor = conn_obj.cursor()
+
+    if data is not None:
+        cursor.execute(query, data)
+        if return_values:
+            to_return = cursor.fetchall()
+    else:
+        cursor.execute(query)
+        if return_values:
+            to_return = cursor.fetchall()
+
+    cursor.close()
+
+    if return_values:
+        return to_return
+
+
 def generate_article_query(field_names):
 
     article_query = '''

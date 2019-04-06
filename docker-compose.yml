@@ -1,16 +1,19 @@
 version: "3.0"
 services:
  content:
-  build: ./content_db
+  build: ./content_db_2
   env_file:
    - ./content_db/env
   environment:
-   - INIT_DB=1
-   - INIT_DATA=1
+   - INIT_DB=0
+   - INIT_DATA=0
+   - PGDATA=/var/lib/postgresql/data/pg_data
   expose:
    - "5432"
+  ports:
+   - "6001:5432"
   volumes:
-   - ./.pg_data:/var/lib/postgresql/data
+   - ./.pg_data:/var/lib/postgresql/data/pg_data
   networks:
    - webnet
  redis:
@@ -29,7 +32,7 @@ services:
    - ./etl/env
   environment:
    - INIT_REDIS=1
-  command: python main.py --nyt_begin '20181101' --nyt_end '20181231'
+  command: python main.py #--nyt_begin '20181201' --nyt_end '20181205'
   volumes:
    - ./logs:/app/logs
   depends_on:
