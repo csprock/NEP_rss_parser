@@ -9,8 +9,8 @@ parser.add_argument('--nyt_begin', type=str, default=None)
 parser.add_argument('--nyt_end', type=str, default=None)
 
 args = parser.parse_args()
-NYT_BEGIN = args.nyt_begin
-NYT_END = args.nyt_end
+# NYT_BEGIN = args.nyt_begin
+# NYT_END = args.nyt_end
 
 import logging.config
 
@@ -23,6 +23,14 @@ APSCHEDULER_LOGGER = logging.getLogger('apscheduler.scheduler')
 
 from rss_scraper.parser.parser import execute_rss_parser as rss_execute
 from nyt_scraper.execute_nyt_scraper import execute as nyt_execute
+from nyt_scraper.etl_utils import generate_dates
+
+_, nyt_begin = generate_dates()
+
+NYT_BEGIN = args.nyt_begin if args.nyt_begin is not None else nyt_begin
+NYT_END = args.nyt_begin if args.nyt_begin is not None else nyt_begin
+
+LOGGER.info("NYT Start and end dates: {}, {}".format(NYT_BEGIN, NYT_END))
 
 
 from apscheduler.schedulers.background import BlockingScheduler
@@ -32,11 +40,11 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 # Postgres credentials
-PG_HOST = os.environ['PG_HOST']
-PG_PASSWORD = os.environ['PG_PASSWORD']
-PG_USER = os.environ['PG_USER']
-PG_DB = os.environ['PG_DB']
-PG_PORT = os.environ['PG_PORT']
+PG_HOST = os.environ['PGHOST']
+PG_PASSWORD = os.environ['PGPASSWORD']
+PG_USER = os.environ['PGUSER']
+PG_DB = os.environ['PGDATABASE']
+PG_PORT = os.environ['PGPORT']
 
 # redis credentials
 REDIS_HOST = os.environ.get('REDIS_HOST', None)
