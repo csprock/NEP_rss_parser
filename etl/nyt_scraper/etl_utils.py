@@ -5,6 +5,7 @@ import sys
 import json
 import logging
 from requests.exceptions import ConnectionError
+import psycopg2
 
 import redis
 
@@ -12,7 +13,7 @@ mypath = os.path.dirname(os.path.realpath('__file__'))
 sys.path.append(os.path.join(mypath, os.path.pardir))
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath('__file__')), 'nyt_scraper'))
 
-from database_utils import execute_query
+from database_utils import execute_query, execute_query2
 from database_utils import generate_article_query, generate_tag_query, generate_keyword_query, generate_place_mentions_query
 from nyt_scraper.results_parser import make_article_tuple, make_place_tag_tuple, make_keyword_tuples
 from nyt_scraper.articleAPI import articleAPI
@@ -283,13 +284,8 @@ class NYTScraper:
 
                 self.return_failed_job()
 
-                # return_failed_job(self.redis_conn,
-                #                   place_id=job['place_id'],
-                #                   place_name=job['place_name'],
-                #                   begin_date=job['begin_date'],
-                #                   end_date=job['end_date'])
-
                 break
+
             except APIError as e:
                 LOGGER.error(e.args[0])
                 self.return_failed_job()
@@ -300,15 +296,12 @@ class NYTScraper:
 
                 self.return_failed_job()
 
-                # return_failed_job(self.redis_conn,
-                #                   place_id=job['place_id'],
-                #                   place_name=job['place_name'],
-                #                   begin_date=job['begin_date'],
-                #                   end_date=job['end_date'])
-
             else:
                 # filter out empty results
+                LOGGER.debug("Length of results before filtering out nones: {}".format(len(results)))
                 results = list(filter(lambda x: x is not None, results))
+                LOGGER.debug("Length of results after filtering out nones: {}".format(len(results)))
+
                 if len(results) > 0:
                     all_results.append(dict(place_id=self.current_job['place_id'], query_results=results))
 
@@ -319,6 +312,7 @@ class NYTScraper:
                 if rem_jobs == 0:
                     LOGGER.debug("Queue empty.")
 
+        LOGGER.debug("Length of all_results before return: {}".format(len(all_results)))
         return all_results
 
     def return_failed_job(self):
@@ -425,13 +419,17 @@ def remove_duplicates(alist):
 
 def insert_results_to_database(conn, all_results, feed_id):
 
+    LOGGER.debug("Length of all_results: {}".format(len(all_results)))
+
     flattened_results = list()
     for place_results in all_results:
         place_id = place_results['place_id']
         for query_result in place_results['query_results']:
             flattened_results.append((place_id, query_result))
 
+    LOGGER.debug("Length of flattened_results before removing duplicates {}".format(len(flattened_results)))
     flattened_results = remove_duplicates(flattened_results)
+    LOGGER.debug("Length of flattened_results after removing duplicates {}".format(len(flattened_results)))
 
     for result in flattened_results:
         place_id = result[0]
@@ -444,14 +442,14 @@ def insert_results_to_database(conn, all_results, feed_id):
     #     for query_result in place_results['query_results']:
     #         execute_insertions_nyt(conn, query_result, feed_id, place_id)
 
-
+# TODO: remove limit in prod
 def get_places(conn, market_id):
 
     #QUERY = "SELECT place_id, place_name FROM places WHERE market_id = {}".format(market_id)
     QUERY = '''
     SELECT place_id, place_name 
     FROM media_markets INNER JOIN places ON media_markets.id = places.market_id 
-    INNER JOIN place_aliases ON places.id = place_aliases.place_id WHERE market_id = {};
+    INNER JOIN place_aliases ON places.id = place_aliases.place_id WHERE market_id = {} LIMIT 50;
     '''.format(market_id)
 
     with conn.cursor() as curs:
@@ -459,3 +457,64 @@ def get_places(conn, market_id):
         results = curs.fetchall()
 
     return results
+
+
+def clinton_purge(conn, feed_id):
+
+    QUERY = '''
+    CREATE TEMP VIEW clinton_purge AS (SELECT DISTINCT(articles.id) FROM articles 
+	    INNER JOIN place_mentions ON articles.id = place_mentions.article_id
+	    INNER JOIN place_aliases ON place_aliases.place_id = place_mentions.place_id
+	    INNER JOIN keywords ON articles.id = keywords.article_id
+        WHERE articles.feed_id={feed_id} 
+	    AND place_aliases.place_id IN (SELECT place_id FROM place_aliases WHERE place_name = 'Chelsea' OR place_name = 'Clinton')
+	    AND (keyword = 'Clinton, Hillary Rodham' OR keyword = 'Clinton, Bill' OR keyword = 'Clinton, Chelsea')
+	    AND tag = 'persons');
+	
+    DELETE FROM keywords WHERE keywords.article_id IN (SELECT id FROM clinton_purge);
+    DELETE FROM place_mentions WHERE place_mentions.article_id IN (SELECT id FROM clinton_purge);
+    DELETE FROM articles WHERE articles.id IN (SELECT id FROM clinton_purge);
+
+    DROP VIEW clinton_purge;
+    '''.format(feed_id=feed_id)
+
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(QUERY)
+        LOGGER.info("Clintons purged.")
+    except psycopg2.Error:
+        LOGGER.error("Error in clinton purge.")
+    finally:
+        cursor.close()
+
+    # with conn.cursor() as curs:
+    #     LOGGER.info("Running Clinton purge.")
+    #     curs.execute(QUERY)
+
+
+def real_estate_purge(conn):
+    QUERY = '''
+    CREATE TEMP VIEW real_estate_purge AS (SELECT DISTINCT(keywords.article_id) FROM
+        keywords WHERE keywords.keyword LIKE '%Real Estate%');
+    
+    DELETE FROM keywords WHERE keywords.article_id IN (SELECT article_id FROM real_estate_purge);
+    DELETE FROM place_mentions WHERE place_mentions.article_id IN (SELECT article_id FROM real_estate_purge);
+    DELETE FROM articles WHERE articles.id IN (SELECT article_id FROM real_estate_purge);
+    
+    DROP VIEW real_estate_purge;
+    '''
+
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(QUERY)
+        LOGGER.info("Real estate purged.")
+    except psycopg2.Error:
+        LOGGER.exception("Real estate purge error.")
+    finally:
+        cursor.close()
+
+    # with conn.cursor() as curs:
+    #     LOGGER.info("Running Clinton purge.")
+    #     curs.execute(QUERY)
