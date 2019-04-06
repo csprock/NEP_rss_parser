@@ -61,13 +61,13 @@ FEED_ID = int(os.environ['NYT_FEED_ID'])
 
 # NYT job config
 
-NYT_DAY = os.environ.get('NYT_DAY')
-NYT_MONTH = os.environ.get('NYT_MONTH')
-NYT_WEEK = os.environ.get('NYT_WEEK')
-NYT_DAY_OF_WEEK = os.environ.get('NYT_DAY_OF_WEEK')
-NYT_HOUR = os.environ['NYT_HOUR']
-NYT_MINUTE = os.environ['NYT_MINUTE']
-NYT_SECOND = os.environ['NYT_SECOND']
+# NYT_DAY = os.environ.get('NYT_DAY')
+# NYT_MONTH = os.environ.get('NYT_MONTH')
+# NYT_WEEK = os.environ.get('NYT_WEEK')
+# NYT_DAY_OF_WEEK = os.environ.get('NYT_DAY_OF_WEEK')
+# NYT_HOUR = os.environ['NYT_HOUR']
+# NYT_MINUTE = os.environ['NYT_MINUTE']
+# NYT_SECOND = os.environ['NYT_SECOND']
 
 # RSS job config
 
@@ -81,17 +81,17 @@ NYT_SECOND = os.environ['NYT_SECOND']
 #
 # RSS_INTERVAL = os.environ['RSS_INTERVAL']
 
-NYT_SCHEDULE_CONFIG = {
-    'month': NYT_MONTH,
-    'day': NYT_DAY,
-    'week': NYT_WEEK,
-    'day_of_week': NYT_DAY_OF_WEEK,
-    'hour': NYT_HOUR,
-    'minute': NYT_MINUTE,
-    'second': NYT_SECOND,
-    'timezone': timezone('US/Eastern')
-}
-
+# NYT_SCHEDULE_CONFIG = {
+#     'month': NYT_MONTH,
+#     'day': NYT_DAY,
+#     'week': NYT_WEEK,
+#     'day_of_week': NYT_DAY_OF_WEEK,
+#     'hour': NYT_HOUR,
+#     'minute': NYT_MINUTE,
+#     'second': NYT_SECOND,
+#     'timezone': timezone('US/Eastern')
+# }
+#
 
 # RSS_SCHEDULE_CONFIG = {
 #     'month': RSS_MONTH,
@@ -138,27 +138,27 @@ if int(os.environ['INIT_REDIS']) == 1:
     LOGGER.info("Previous queue overridden.")
 
 
-
-jobstores = {
-    'default': RedisJobStore(**REDIS_CONFIG_SCHEDULER)
-}
-executors = {
-    'default': ThreadPoolExecutor(max_workers=2)
-}
-job_defaults = {
-    'max_instances': 1
-}
-
-scheduler = BlockingScheduler(jobstores=jobstores,
-                                executors=executors,
-                                job_defaults=job_defaults,
-                              logging=APSCHEDULER_LOGGER)
+#
+# jobstores = {
+#     'default': RedisJobStore(**REDIS_CONFIG_SCHEDULER)
+# }
+# executors = {
+#     'default': ThreadPoolExecutor(max_workers=2)
+# }
+# job_defaults = {
+#     'max_instances': 1
+# }
+#
+# scheduler = BlockingScheduler(jobstores=jobstores,
+#                                 executors=executors,
+#                                 job_defaults=job_defaults,
+#                               logging=APSCHEDULER_LOGGER)
 
 ####### define triggers ######
 
 #rss_interval_trigger = IntervalTrigger(hours=RSS_INTERVAL)
 
-nyt_trigger = CronTrigger(**NYT_SCHEDULE_CONFIG)
+# nyt_trigger = CronTrigger(**NYT_SCHEDULE_CONFIG)
 #rss_trigger = CronTrigger(**RSS_SCHEDULE_CONFIG)
 
 

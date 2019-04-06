@@ -1,1 +1,0 @@
-This is a test string for the SearchGraph entity matcher. The root names are Portland, San Jose and Crown Heights. Oakland is a singleton. San Jose and Portland share Portland San Jose. South San Jose Terrace is two levels below San Jose, as is South Portland Heights. South Portland Heights Plaza is three levels below its root. 

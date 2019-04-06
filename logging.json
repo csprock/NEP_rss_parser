@@ -6,27 +6,6 @@
       "class": "logging.StreamHandler",
       "level": "DEBUG",
       "formatter": "standard"
-    },
-    "rss_prod": {
-      "class": "logging.handlers.TimedRotatingFileHandler",
-      "level": "INFO",
-      "formatter": "standard",
-      "filename": "logs/rss.log",
-      "when": "D",
-      "interval": 1,
-      "atTime": "midnight"
-    },
-    "nyt_prod": {
-      "class": "logging.FileHandler",
-      "level": "INFO",
-      "formatter": "standard",
-      "filename": "logs/nyt.log"
-    },
-    "apscheduler.scheduler": {
-      "class": "logging.FileHandler",
-      "level": "INFO",
-      "formatter": "standard",
-      "filename": "logs/apscheduler.log"
     }
   },
   "formatters": {
@@ -37,15 +16,15 @@
   "loggers": {
     "etl.etl_utils": {
       "propagate": false,
-      "handlers": ["console", "nyt_prod"]
+      "handlers": ["console"]
     },
     "etl.execute_nyt_scraper": {
       "propagate": false,
-      "handlers": ["console", "nyt_prod"]
+      "handlers": ["console"]
     },
     "etl.rss_parser": {
       "propagate": false,
-      "handlers": ["console", "rss_prod"]
+      "handlers": ["console"]
     },
     "etl": {
       "propagate": false,
@@ -53,7 +32,7 @@
     },
     "etl.parsing_utils": {
       "propagate": false,
-      "handlers": ["console", "rss_prod"]
+      "handlers": ["console"]
     },
     "etl.nyt_scraper.articleAPI": {
       "propagate": false,
