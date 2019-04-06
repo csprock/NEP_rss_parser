@@ -22,7 +22,7 @@ logging.config.dictConfig(logging_config)
 LOGGER = logging.getLogger('etl')
 APSCHEDULER_LOGGER = logging.getLogger('apscheduler.scheduler')
 
-from rss_scraper.parser.parser import execute_rss_parser as rss_execute
+# from rss_scraper.parser.parser import execute_rss_parser as rss_execute
 from nyt_scraper.execute_nyt_scraper import execute as nyt_execute
 from nyt_scraper.etl_utils import generate_dates
 
@@ -34,11 +34,11 @@ NYT_END = args.nyt_begin if args.nyt_begin is not None else nyt_begin
 LOGGER.info("NYT Start and end dates: {}, {}".format(NYT_BEGIN, NYT_END))
 
 
-from apscheduler.schedulers.background import BlockingScheduler
-from apscheduler.jobstores.redis import RedisJobStore
-from apscheduler.executors.pool import ThreadPoolExecutor
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
+# from apscheduler.schedulers.background import BlockingScheduler
+# from apscheduler.jobstores.redis import RedisJobStore
+# from apscheduler.executors.pool import ThreadPoolExecutor
+# from apscheduler.triggers.cron import CronTrigger
+# from apscheduler.triggers.interval import IntervalTrigger
 
 # Postgres credentials
 PG_HOST = os.getenv('PGHOST')
@@ -152,7 +152,7 @@ if INIT_REDIS == 1:
         redis_conn_queue = redis.Redis(**REDIS_CONFIG_NYT)
     except TypeError:
         redis_conn_queue = redis.Redis.from_url(REDIS_URI)
-        
+
     flush_status = redis_conn_queue.flushdb()
     #_ = redis_conn_queue.delete('queue')
 
