@@ -449,7 +449,7 @@ def get_places(conn, market_id):
     QUERY = '''
     SELECT place_id, place_name 
     FROM media_markets INNER JOIN places ON media_markets.id = places.market_id 
-    INNER JOIN place_aliases ON places.id = place_aliases.place_id WHERE market_id = {} LIMIT 5;
+    INNER JOIN place_aliases ON places.id = place_aliases.place_id WHERE market_id = {};
     '''.format(market_id)
 
     with conn.cursor() as curs:
